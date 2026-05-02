@@ -21,57 +21,53 @@ let _schemaReady = false;
 export async function ensureSchema() {
   if (_schemaReady) return;
   const sql = db();
-  try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id            TEXT PRIMARY KEY,
-        name          TEXT NOT NULL,
-        email         TEXT UNIQUE NOT NULL,
-        phone         TEXT,
-        password_hash TEXT NOT NULL,
-        role          TEXT NOT NULL DEFAULT 'customer',
-        verified      BOOLEAN NOT NULL DEFAULT FALSE,
-        is_active     BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`;
-    await sql`
-      CREATE TABLE IF NOT EXISTS otps (
-        email      TEXT PRIMARY KEY,
-        code_hash  TEXT NOT NULL,
-        purpose    TEXT NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL,
-        attempts   INT NOT NULL DEFAULT 0
-      )
-    `;
-    await sql`
-      CREATE TABLE IF NOT EXISTS bookings (
-        id                   TEXT PRIMARY KEY,
-        appointment_type_id  TEXT NOT NULL,
-        provider_id          TEXT NOT NULL,
-        customer_id          TEXT NOT NULL,
-        customer_name        TEXT NOT NULL,
-        customer_email       TEXT NOT NULL,
-        slot_start           TIMESTAMPTZ NOT NULL,
-        capacity_count       INT NOT NULL DEFAULT 1,
-        status               TEXT NOT NULL DEFAULT 'confirmed',
-        payment_status       TEXT NOT NULL DEFAULT 'unpaid',
-        payment_id           TEXT,
-        razorpay_order_id    TEXT,
-        answers              JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-    await sql`
-      CREATE INDEX IF NOT EXISTS bookings_slot_idx
-      ON bookings (appointment_type_id, provider_id, slot_start)
-      WHERE status <> 'cancelled'
-    `;
-    _schemaReady = true;
-  } finally {
-    // Release the connection back so it isn't reused across requests
-    await sql.end({ timeout: 1 }).catch(() => {});
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      email         TEXT UNIQUE NOT NULL,
+      phone         TEXT,
+      password_hash TEXT NOT NULL,
+      role          TEXT NOT NULL DEFAULT 'customer',
+      verified      BOOLEAN NOT NULL DEFAULT FALSE,
+      is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS otps (
+      email      TEXT PRIMARY KEY,
+      code_hash  TEXT NOT NULL,
+      purpose    TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts   INT NOT NULL DEFAULT 0
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS bookings (
+      id                   TEXT PRIMARY KEY,
+      appointment_type_id  TEXT NOT NULL,
+      provider_id          TEXT NOT NULL,
+      customer_id          TEXT NOT NULL,
+      customer_name        TEXT NOT NULL,
+      customer_email       TEXT NOT NULL,
+      slot_start           TIMESTAMPTZ NOT NULL,
+      capacity_count       INT NOT NULL DEFAULT 1,
+      status               TEXT NOT NULL DEFAULT 'confirmed',
+      payment_status       TEXT NOT NULL DEFAULT 'unpaid',
+      payment_id           TEXT,
+      razorpay_order_id    TEXT,
+      answers              JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS bookings_slot_idx
+    ON bookings (appointment_type_id, provider_id, slot_start)
+    WHERE status <> 'cancelled'
+  `;
+  _schemaReady = true;
 }
+
 
