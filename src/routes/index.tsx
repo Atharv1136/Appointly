@@ -80,9 +80,13 @@ function Landing() {
             { icon: Zap, title: "Instant confirmation", body: "Auto-confirm or manual approval — your choice, per service." },
             { icon: Shield, title: "Secure by default", body: "Authentication and OTP verification keep accounts safe." },
             { icon: Sparkles, title: "Reschedule in 2 clicks", body: "Customers can move their booking without an email thread." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-border bg-card p-6 shadow-card transition-shadow hover:shadow-elevated">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
+          ].map((f, i) => (
+            <div
+              key={f.title}
+              className="card-lift animate-fade-in-up rounded-2xl border border-border bg-card p-6 shadow-card"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-md">
                 <f.icon className="h-5 w-5" />
               </div>
               <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
@@ -104,22 +108,23 @@ function Landing() {
             </Button>
           </div>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {services.map((s: AppointmentType) => (
+            {services.map((s: AppointmentType, i: number) => (
               <Link
                 key={s.id}
                 to="/book/$id"
                 params={{ id: s.id }}
-                className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated"
+                className="card-lift group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-card animate-fade-in-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">{s.category}</span>
                   <span className="text-xs text-muted-foreground">{s.durationMins} min</span>
                 </div>
-                <h3 className="text-base font-semibold leading-tight">{s.title}</h3>
+                <h3 className="text-base font-semibold leading-tight transition-colors group-hover:text-primary">{s.title}</h3>
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{s.description}</p>
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                   <span className="text-xs text-muted-foreground">{s.organiser}</span>
-                  <span className="text-sm font-medium text-primary group-hover:underline">Book →</span>
+                  <span className="text-sm font-medium text-primary transition-transform group-hover:translate-x-1">Book →</span>
                 </div>
               </Link>
             ))}
