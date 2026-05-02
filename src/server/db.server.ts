@@ -32,9 +32,12 @@ export async function ensureSchema() {
         password_hash TEXT NOT NULL,
         role          TEXT NOT NULL DEFAULT 'customer',
         verified      BOOLEAN NOT NULL DEFAULT FALSE,
+        is_active     BOOLEAN NOT NULL DEFAULT TRUE,
         created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+    // Add is_active for older deployments
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`;
     await sql`
       CREATE TABLE IF NOT EXISTS otps (
         email      TEXT PRIMARY KEY,

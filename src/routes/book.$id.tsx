@@ -30,7 +30,15 @@ function BookingPage() {
   const { service } = Route.useLoaderData();
   const appt = service as AppointmentType;
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  // Auth gate — booking requires sign-in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      toast.error("Please sign in to book an appointment");
+      navigate({ to: "/login", search: { redirect: `/book/${appt.id}` } });
+    }
+  }, [authLoading, user, navigate, appt.id]);
 
   const [step, setStep] = useState(0);
   const [provider, setProvider] = useState<Provider | null>(appt.providers[0] ?? null);
@@ -143,6 +151,16 @@ function BookingPage() {
       setSubmitting(false);
     }
   };
+
+  if (authLoading || !user) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-md px-4 py-24 text-center">
+          <p className="text-sm text-muted-foreground">Checking your session...</p>
+        </div>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>

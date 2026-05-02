@@ -12,12 +12,20 @@ import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in — Appointly" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" ? s.redirect : "" }),
   component: LoginPage,
 });
+
+function roleHome(role: string) {
+  if (role === "admin") return "/admin";
+  if (role === "organiser") return "/organiser";
+  return "/services";
+}
 
 function LoginPage() {
   const { setUser } = useAuth();
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -40,7 +48,8 @@ function LoginPage() {
       }
       setUser(res.user as User);
       toast.success("Welcome back!");
-      navigate({ to: "/services" });
+      const dest = search.redirect || roleHome(res.user.role);
+      navigate({ to: dest });
     } catch (err) {
       toast.error((err as Error).message || "Could not log in");
     } finally {

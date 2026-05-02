@@ -17,6 +17,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppointmentsRouteImport } from './routes/appointments'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OrganiserIndexRouteImport } from './routes/organiser.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as BookIdRouteImport } from './routes/book.$id'
 
 const VerifyOtpRoute = VerifyOtpRouteImport.update({
@@ -59,6 +61,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganiserIndexRoute = OrganiserIndexRouteImport.update({
+  id: '/organiser/',
+  path: '/organiser/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookIdRoute = BookIdRouteImport.update({
   id: '/book/$id',
   path: '/book/$id',
@@ -75,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/book/$id': typeof BookIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/organiser/': typeof OrganiserIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +100,8 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/book/$id': typeof BookIdRoute
+  '/admin': typeof AdminIndexRoute
+  '/organiser': typeof OrganiserIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +114,8 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/book/$id': typeof BookIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/organiser/': typeof OrganiserIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +129,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-otp'
     | '/book/$id'
+    | '/admin/'
+    | '/organiser/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +142,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-otp'
     | '/book/$id'
+    | '/admin'
+    | '/organiser'
   id:
     | '__root__'
     | '/'
@@ -133,6 +155,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-otp'
     | '/book/$id'
+    | '/admin/'
+    | '/organiser/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +169,8 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
   BookIdRoute: typeof BookIdRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  OrganiserIndexRoute: typeof OrganiserIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -205,6 +231,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organiser/': {
+      id: '/organiser/'
+      path: '/organiser'
+      fullPath: '/organiser/'
+      preLoaderRoute: typeof OrganiserIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/book/$id': {
       id: '/book/$id'
       path: '/book/$id'
@@ -225,6 +265,8 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   VerifyOtpRoute: VerifyOtpRoute,
   BookIdRoute: BookIdRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  OrganiserIndexRoute: OrganiserIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
