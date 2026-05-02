@@ -1,140 +1,129 @@
-## Goal
+# Appointment App — Full Feature Audit & Gap Fix Plan
 
-Today the Organiser dashboard only **views** stats over a hard-coded list of 4 services in `services-catalog.server.ts`. After signup, an organiser cannot create their own service, set durations, working hours, prices, or custom questions. We will rebuild it as a full self-service control panel backed by the database, matching the PRD (sections 4.5 – 4.8).
+Below is the complete PRD checklist with current implementation status, followed by the work to close the remaining gaps.
 
----
+## ✅ Already implemented & working
 
-## What the organiser will be able to do
+**Authentication & Onboarding**
+- ✅ Email + password signup (name, email, password)
+- ✅ OTP verification after signup (Lovable Emails)
+- ✅ Email + password login with JWT session
+- ✅ Role-based routing post-login (customer → /services, organiser → /organiser, admin → /admin)
+- ✅ Role picker on signup (customer / organiser)
 
-1. **Sign up & onboard** — pick the "Organiser" role at signup, land on a guided onboarding screen that walks through creating their first service.
-2. **Create & manage services (Appointment Types)**
-   - Title, description, category, currency
-   - Duration (15 / 30 / 45 / 60 min or custom)
-   - Working hours (per weekday, with breaks)
-   - Capacity: single or group (max people per slot)
-   - Pricing: free / advance payment with amount
-   - Manual confirmation toggle (auto-confirm vs approve-each)
-   - Min lead time + max advance booking window
-   - Buffer time between appointments
-   - Publish / unpublish toggle + private share link for unpublished
-3. **Manage providers / resources**
-   - Add staff or resources to a service (name, title, initials/avatar)
-   - Per-provider working hours overrides
-4. **Custom booking-form questions**
-   - Add/edit/delete questions (text, textarea, select with options)
-   - Mark required, reorder
-5. **Manage bookings**
-   - List + calendar view, filter by date/status/service/provider
-   - Confirm, cancel, reschedule, reassign provider
-   - View customer answers and payment status
-6. **Reports**
-   - Bookings over time, peak-hour heatmap, revenue, top services, provider utilisation
+**Customer**
+- ✅ Browse published appointment types (`/services`)
+- ✅ Search & category filter
+- ✅ Multi-step booking flow: provider → date → slot → details → confirm → done
+- ✅ Real-time slot availability (DB-backed `getSlots`)
+- ✅ Capacity selector when manage_capacity enabled
+- ✅ Custom questions form rendered from organiser config
+- ✅ Razorpay advance payment when required
+- ✅ Confirmation page with calendar links
+- ✅ My appointments list (upcoming + past, status badges)
+- ✅ Cancel booking
+- ✅ Reschedule (date/time only)
+- ✅ Print payment receipt
 
----
+**Organiser**
+- ✅ Dashboard with Overview / Bookings / Services / Reports tabs
+- ✅ Create / edit / delete appointment types
+- ✅ Set duration, currency, working hours, lead time, max-advance window, buffer
+- ✅ Manage providers (add / edit / remove)
+- ✅ Add custom questions (text / textarea / select)
+- ✅ Publish / unpublish toggle
+- ✅ Capacity management toggle + max capacity
+- ✅ Advance payment toggle + amount
+- ✅ Manual confirmation toggle
+- ✅ Bookings list with status filter, manual confirm/cancel
+- ✅ Reports: totals, peak booking hour distribution, top services
 
-## Database changes (new migration)
+**Admin**
+- ✅ Stats dashboard (users, organisers, customers, services, bookings, revenue, 14-day trend)
+- ✅ List all users
+- ✅ Activate / deactivate user accounts
+- ✅ Promote / demote roles (customer ↔ organiser ↔ admin)
+- ✅ View all bookings, update booking status
 
-```text
-appointment_types   id, organiser_id, title, description, category,
-                    duration_mins, currency, manage_capacity, max_capacity,
-                    advance_payment, payment_amount, manual_confirm,
-                    min_lead_mins, max_advance_days, buffer_mins,
-                    is_published, share_token, created_at
+**Email (Lovable Emails)**
+- ✅ Signup OTP
+- ✅ Booking confirmation / reserved (one combined send today)
 
-providers           id, appointment_type_id, name, title, initials,
-                    working_hours_json (per-weekday start/end + breaks)
-
-questions           id, appointment_type_id, label, field_type,
-                    options_json, required, sort_order
-
-bookings (existing) + new columns: organiser_id (denormalised for fast filter)
-answers             stored as JSONB on bookings (already present)
-```
-
-`services-catalog.server.ts` becomes a one-time **seed** for demo data, then is removed from the runtime path. `findAppt`/`listServices`/`getService` are rewritten to query the DB.
-
----
-
-## New server functions (`src/server/organiser.functions.ts`)
-
-All gated by `requireOrganiserOrAdmin()` and scoped to `organiser_id = session.sub`:
-
-- `listMyServices`, `getMyService(id)`
-- `createService(data)`, `updateService(id, data)`, `deleteService(id)`
-- `togglePublish(id, published)`
-- `addProvider`, `updateProvider`, `removeProvider`
-- `addQuestion`, `updateQuestion`, `removeQuestion`, `reorderQuestions`
-- `confirmBooking(id)`, `cancelBookingAdmin(id)`, `rescheduleBookingAdmin(id, slot)`, `reassignProvider(id, providerId)`
-- `organiserStats` (extended with revenue + utilisation, scoped to organiser)
-
-Existing customer-facing `getSlots` / `createBookingFn` are updated to read service config from the DB instead of the static catalog.
+**Data model & reliability**
+- ✅ Postgres tables: users, otps, bookings, appointment_types, providers, questions
+- ✅ Row-level lock + capacity check prevents double booking
+- ✅ Bcrypt password hashing, JWT sessions, role-guarded routes
+- ✅ OTP expiry enforcement
 
 ---
 
-## New & updated routes
+## ❌ Missing / incomplete (gap list)
 
-```text
-src/routes/organiser.index.tsx            existing — refactored
-src/routes/organiser.services.new.tsx     create-service wizard
-src/routes/organiser.services.$id.tsx     edit service: tabs for
-                                          Details · Hours · Providers ·
-                                          Questions · Rules · Preview
-src/routes/organiser.bookings.tsx         full bookings management
-src/routes/organiser.onboarding.tsx       first-run wizard after signup
-src/routes/signup.tsx                     add role picker (customer/organiser)
-```
+### A. Authentication
+1. **Forgot-password is a stub** — UI only, no token issuance, no reset email, no `/reset-password` route.
 
-The dashboard's existing **Overview / Bookings / Services / Reports** tabs stay, but each card/row gets real CRUD actions ("Edit", "Publish", "Delete", "+ New service").
+### B. Customer flow
+2. **No "share unpublished via private link"** — `share_token` column exists but isn't generated or honored in the booking page (unpublished services 404 even with a token).
+3. **Reschedule email** — no email is sent after a successful reschedule.
+4. **Cancel email** — no email is sent on cancel.
 
----
+### C. Organiser features
+5. **No flexible / weekly schedule builder** — only a single `working_start`/`working_end` window; PRD asks for weekly recurring + date-specific overrides (`schedules` table missing).
+6. **Per-provider working hours** — providers share the service's hours; PRD wants hours per provider/resource.
+7. **Resource-based appointments** — only "user-based" providers exist; no `type: resource` mode or resource naming.
+8. **Assignment mode** (auto vs manual) — not implemented; customer always picks provider.
+9. **Booking calendar view** — only list view exists, no calendar grid.
+10. **Reassign provider on a booking** — no UI/server fn.
+11. **New-booking alert email to organiser** — only the customer is emailed.
+12. **Booking page preview before publishing** — no preview link from the editor.
+13. **Provider/resource utilisation report** — reports tab has hours histogram but no utilisation %.
+14. **Onboarding wizard** for first-time organisers — none.
 
-## UI building blocks
+### D. Admin
+15. **Per-organiser breakdown** in admin (count of services/bookings per organiser) — not shown.
 
-- Service form with `react-hook-form` + zod, sectioned card layout
-- Weekly hours editor: 7 rows (Mon–Sun) with start/end time pickers + "Closed" toggle
-- Providers manager: inline list with add/edit dialog
-- Questions manager: drag-to-reorder list with type selector
-- Rules section: capacity, payment amount, manual confirm switches, lead-time sliders
-- Live "Preview booking page" panel that renders the customer-side card + slot grid for the in-progress config
-- Calendar view for bookings using existing `Calendar` shadcn component
-
----
-
-## Auth / signup flow
-
-- Signup form gains a **"I'm an organiser"** option (or a separate `/signup/organiser` route) that sets `role='organiser'` on user creation.
-- After OTP verification an organiser is redirected to `/organiser/onboarding` (create first service) instead of `/`.
-- `RoleGuard` already supports `["organiser","admin"]` — no changes needed.
+### E. Non-functional / polish
+16. **`is_active` not enforced at login** — deactivated users can still sign in.
+17. **WCAG keyboard nav** for calendar/slot picker — not audited.
 
 ---
 
-## Migration / backwards-compat
+## 🔧 Plan to close the gaps
 
-- On first run we seed the existing 4 catalog services into the DB under a system organiser id `org_seed` so the public services page keeps working.
-- `services-catalog.server.ts` is deleted after the seed runs once.
-- Bookings table keeps current shape; new `organiser_id` column is back-filled from each booking's appointment type.
+Phased so each phase is shippable on its own.
 
----
+### Phase 1 — Email & auth completion
+- Add `password_reset_tokens` table (token hash, user_id, expires_at).
+- New server fns: `requestPasswordReset`, `resetPassword`. Send reset email via Lovable Emails.
+- Wire `/forgot-password` to call the server fn; create `/reset-password` route with token in URL.
+- Send **reschedule confirmation** and **cancellation** emails from `rescheduleBooking` / `cancelBooking`.
+- Send **new-booking alert** to the organiser inside `createBookingFn` (lookup organiser email by `organiser_id`).
+- Block login when `is_active = false` (return a clear error in `loginVerify`).
 
-## Out of scope (call out, defer to next iteration)
+### Phase 2 — Schedules & resources
+- New `schedules` table: `id, appointment_type_id, provider_id, schedule_type ('weekly'|'flexible'), slots_json` (weekly: `{mon:[{start,end}], ...}`, flexible: `{ '2026-05-10':[{start,end}] }`).
+- Editor UI in `organiser.services.$id.tsx` → new "Schedule" sub-tab per provider.
+- `getSlots` reads schedule for the chosen provider; falls back to `working_start/end` if no schedule row exists (back-compat).
+- Add `appointment_types.kind` enum `('user'|'resource')` and a `resource_name` field on providers; relabel UI when `kind='resource'`.
+- Add `assignment_mode` ('manual'|'auto') on appointment_types. When auto: customer skips provider step and server picks the first provider with a free slot.
 
-- Stripe payouts to organisers (we keep Razorpay collecting on behalf, view-only revenue report)
-- Two-way Google/Outlook calendar sync (we keep the existing .ics download)
-- SMS notifications
-- Multi-organiser teams / staff sub-accounts with their own logins
+### Phase 3 — Organiser ops & reports
+- Calendar view on the Bookings tab (week grid, drag-free, just visual).
+- `reassignBooking` server fn + dropdown in booking row.
+- Share-link support: generate `share_token` on demand; allow `/book/$id?token=xxx` to bypass `is_published` check.
+- "Preview" button in service editor → opens `/book/$id?token=…` in a new tab.
+- Utilisation report: `(booked_minutes / available_minutes) per provider per week` rendered as a heatmap.
+- First-run onboarding wizard at `/organiser/onboarding` (3 steps: business info → first service → first provider/schedule). Triggered when organiser has zero services.
 
----
+### Phase 4 — Admin polish & a11y
+- Admin: per-organiser table (services count, bookings count, revenue) with click-through.
+- Calendar/slot picker keyboard support: arrow keys move date, Enter selects slot, focus ring visible.
 
-## Build order
+### Technical notes
+- All new tables added inside `ensureSchema()` with `CREATE TABLE IF NOT EXISTS` so existing data is preserved.
+- All new server fns enforce `requireOrganiser` / session checks, matching the existing pattern.
+- Email helpers extended in `email.server.ts` (`passwordResetHtml`, `cancellationHtml`, `rescheduleHtml`, `organiserNewBookingHtml`).
+- Share-token flow: `services.functions.ts#getService` accepts an optional `token` param and returns the service if `is_published OR share_token matches`.
+- No breaking changes to current routes; the booking flow still works for services that don't define a custom schedule.
 
-1. DB migration + seed of existing catalog
-2. Server functions for service CRUD + providers + questions
-3. Rewrite `getSlots`/`createBookingFn`/`listServices` to read from DB
-4. Organiser service-edit route with all tabs
-5. Create-service wizard + onboarding redirect
-6. Bookings management tab actions (confirm/cancel/reschedule/reassign)
-7. Reports: revenue + utilisation
-8. Signup role picker
-9. End-to-end test: signup → create service → publish → book as customer → manage in dashboard
-
-Approve this and I'll switch to build mode and ship it in that order.
+After Phase 1–4 land, every PRD bullet from sections 4.1 → 4.9 and §5 will be checked off.
