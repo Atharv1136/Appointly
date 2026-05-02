@@ -4,23 +4,12 @@ import { CalendarCheck, Clock, MapPin, RotateCw, Trash2, User as UserIcon } from
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DoubleBookingError,
-  getAppointmentType,
-  getAvailableSlots,
-  getBookingsForCustomer,
-  updateBooking,
-  type Booking,
-} from "@/lib/store";
 import { useAuth } from "@/lib/auth-context";
+import type { AppointmentType, Booking } from "@/lib/types";
+import { listServices } from "@/server/services.functions";
+import { myBookings, cancelBooking, rescheduleBooking, getSlots, type SlotInfo } from "@/server/bookings.functions";
 
 export const Route = createFileRoute("/appointments")({
   head: () => ({ meta: [{ title: "My appointments — Appointly" }] }),
@@ -28,27 +17,47 @@ export const Route = createFileRoute("/appointments")({
 });
 
 function AppointmentsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [tick, setTick] = useState(0);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [services, setServices] = useState<AppointmentType[]>([]);
   const [reschedule, setReschedule] = useState<Booking | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const refresh = async () => {
+    const [bk, sv] = await Promise.all([myBookings(), listServices()]);
+    setBookings(bk.bookings as Booking[]);
+    setServices(sv.services as AppointmentType[]);
+    setLoaded(true);
+  };
 
   useEffect(() => {
-    if (!user) navigate({ to: "/login" });
-  }, [user, navigate]);
+    if (authLoading) return;
+    if (!user) {
+      navigate({ to: "/login" });
+      return;
+    }
+    void refresh();
+  }, [user, authLoading, navigate]);
 
-  const all = user ? getBookingsForCustomer(user.id) : [];
+  const findService = (id: string) => services.find((s) => s.id === id);
+
   const now = Date.now();
-  const upcoming = all.filter((b) => new Date(b.slotStart).getTime() > now && b.status !== "cancelled").sort((a, b) => a.slotStart.localeCompare(b.slotStart));
-  const past = all.filter((b) => new Date(b.slotStart).getTime() <= now || b.status === "cancelled").sort((a, b) => b.slotStart.localeCompare(a.slotStart));
+  const upcoming = bookings
+    .filter((b) => new Date(b.slotStart).getTime() > now && b.status !== "cancelled")
+    .sort((a, b) => a.slotStart.localeCompare(b.slotStart));
+  const past = bookings
+    .filter((b) => new Date(b.slotStart).getTime() <= now || b.status === "cancelled")
+    .sort((a, b) => b.slotStart.localeCompare(a.slotStart));
 
-  const refresh = () => setTick((t) => t + 1);
-  void tick;
-
-  const cancel = (b: Booking) => {
-    updateBooking(b.id, { status: "cancelled" });
-    toast.success("Booking cancelled");
-    refresh();
+  const cancel = async (b: Booking) => {
+    try {
+      await cancelBooking({ data: { id: b.id } });
+      toast.success("Booking cancelled");
+      await refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   if (!user) return null;
@@ -61,48 +70,54 @@ function AppointmentsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Manage your upcoming and past bookings.</p>
         </div>
 
-        <Tabs defaultValue="upcoming">
-          <TabsList>
-            <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
-            <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
-          </TabsList>
+        {!loaded ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : (
+          <Tabs defaultValue="upcoming">
+            <TabsList>
+              <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
+              <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="upcoming" className="mt-6 space-y-3">
-            {upcoming.length === 0 ? (
-              <EmptyState
-                title="No upcoming appointments"
-                body="Browse services and book a slot in seconds."
-                cta={<Button asChild><Link to="/services">Browse services</Link></Button>}
-              />
-            ) : (
-              upcoming.map((b) => (
-                <BookingCard
-                  key={b.id}
-                  booking={b}
-                  onReschedule={() => setReschedule(b)}
-                  onCancel={() => cancel(b)}
+            <TabsContent value="upcoming" className="mt-6 space-y-3">
+              {upcoming.length === 0 ? (
+                <EmptyState
+                  title="No upcoming appointments"
+                  body="Browse services and book a slot in seconds."
+                  cta={<Button asChild><Link to="/services">Browse services</Link></Button>}
                 />
-              ))
-            )}
-          </TabsContent>
+              ) : (
+                upcoming.map((b) => (
+                  <BookingCard
+                    key={b.id}
+                    booking={b}
+                    service={findService(b.appointmentTypeId)}
+                    onReschedule={() => setReschedule(b)}
+                    onCancel={() => cancel(b)}
+                  />
+                ))
+              )}
+            </TabsContent>
 
-          <TabsContent value="past" className="mt-6 space-y-3">
-            {past.length === 0 ? (
-              <EmptyState title="No past appointments" body="Your booking history will appear here." />
-            ) : (
-              past.map((b) => <BookingCard key={b.id} booking={b} past />)
-            )}
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="past" className="mt-6 space-y-3">
+              {past.length === 0 ? (
+                <EmptyState title="No past appointments" body="Your booking history will appear here." />
+              ) : (
+                past.map((b) => <BookingCard key={b.id} booking={b} service={findService(b.appointmentTypeId)} past />)
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
 
       {reschedule && (
         <RescheduleDialog
           booking={reschedule}
+          service={findService(reschedule.appointmentTypeId)}
           onClose={() => setReschedule(null)}
-          onDone={() => {
+          onDone={async () => {
             setReschedule(null);
-            refresh();
+            await refresh();
           }}
         />
       )}
@@ -138,17 +153,18 @@ function StatusBadge({ status }: { status: Booking["status"] }) {
 
 function BookingCard({
   booking,
+  service,
   past,
   onReschedule,
   onCancel,
 }: {
   booking: Booking;
+  service?: AppointmentType;
   past?: boolean;
   onReschedule?: () => void;
   onCancel?: () => void;
 }) {
-  const appt = getAppointmentType(booking.appointmentTypeId);
-  const provider = appt?.providers.find((p) => p.id === booking.providerId);
+  const provider = service?.providers.find((p) => p.id === booking.providerId);
   const date = new Date(booking.slotStart);
 
   return (
@@ -156,10 +172,10 @@ function BookingCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold">{appt?.title ?? "Appointment"}</h3>
+            <h3 className="text-base font-semibold">{service?.title ?? "Appointment"}</h3>
             <StatusBadge status={booking.status} />
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{appt?.organiser}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{service?.organiser}</p>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             <div className="flex items-center gap-2"><CalendarCheck className="h-4 w-4 text-muted-foreground" /> {date.toLocaleDateString()}</div>
             <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-muted-foreground" /> {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
@@ -187,37 +203,46 @@ function BookingCard({
 
 function RescheduleDialog({
   booking,
+  service,
   onClose,
   onDone,
 }: {
   booking: Booking;
+  service?: AppointmentType;
   onClose: () => void;
   onDone: () => void;
 }) {
-  const appt = getAppointmentType(booking.appointmentTypeId);
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return d;
   });
+  const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [slotIso, setSlotIso] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const slots = useMemo(() => {
-    if (!appt) return [];
-    return getAvailableSlots(appt.id, booking.providerId, date);
-  }, [appt, booking.providerId, date]);
+  useEffect(() => {
+    if (!service) return;
+    getSlots({ data: { appointmentTypeId: service.id, providerId: booking.providerId, dateISO: date.toISOString() } })
+      .then((r) => setSlots(r.slots))
+      .catch(() => setSlots([]));
+  }, [service, booking.providerId, date]);
 
-  if (!appt) return null;
+  const filteredSlots = useMemo(() => slots, [slots]);
 
-  const confirm = () => {
+  if (!service) return null;
+
+  const confirm = async () => {
     if (!slotIso) return;
+    setBusy(true);
     try {
-      updateBooking(booking.id, { slotStart: slotIso });
+      await rescheduleBooking({ data: { id: booking.id, slotStartISO: slotIso } });
       toast.success("Booking rescheduled");
       onDone();
     } catch (e) {
-      if (e instanceof DoubleBookingError) toast.error(e.message);
-      else toast.error("Could not reschedule");
+      toast.error((e as Error).message || "Could not reschedule");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -240,11 +265,11 @@ function RescheduleDialog({
           </div>
           <div>
             <div className="mb-2 text-xs font-medium text-muted-foreground">Pick a new time</div>
-            {slots.length === 0 ? (
+            {filteredSlots.length === 0 ? (
               <p className="text-sm text-muted-foreground">No slots available.</p>
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {slots.map((s) => (
+                {filteredSlots.map((s) => (
                   <button
                     key={s.iso}
                     disabled={!s.available}
@@ -263,15 +288,15 @@ function RescheduleDialog({
               </div>
             )}
           </div>
-          {appt.organiser && (
+          {service.organiser && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" /> {appt.organiser}
+              <MapPin className="h-3.5 w-3.5" /> {service.organiser}
             </p>
           )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={confirm} disabled={!slotIso}>Confirm</Button>
+          <Button onClick={confirm} disabled={!slotIso || busy}>{busy ? "Saving..." : "Confirm"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
