@@ -107,8 +107,9 @@ export const createBookingFn = createServerFn({ method: "POST" })
     // Transaction with row-level lock to prevent double booking
     try {
       const result = await sql.begin(async (tx) => {
-        const used = await tx`
-          SELECT COALESCE(SUM(capacity_count), 0)::int AS used
+        // Lock matching rows first (FOR UPDATE can't be combined with aggregates)
+        const rows = await tx`
+          SELECT capacity_count
           FROM bookings
           WHERE appointment_type_id=${appt.id}
             AND provider_id=${provider.id}
@@ -116,7 +117,7 @@ export const createBookingFn = createServerFn({ method: "POST" })
             AND status <> 'cancelled'
           FOR UPDATE
         `;
-        const usedNum = Number(used[0]?.used ?? 0);
+        const usedNum = rows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + data.capacityCount > cap) {
           throw new Error("DOUBLE_BOOKING");
         }
