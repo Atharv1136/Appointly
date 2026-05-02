@@ -152,6 +152,16 @@ function BookingPage() {
     }
   };
 
+  if (authLoading || !user) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-md px-4 py-24 text-center">
+          <p className="text-sm text-muted-foreground">Checking your session...</p>
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
