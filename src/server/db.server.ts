@@ -151,6 +151,12 @@ export async function ensureSchema() {
   `;
 
   // Seeding disabled — organisers create their own services from the dashboard.
+  // One-time cleanup: remove legacy demo services seeded under 'org_seed'.
+  await sql`DELETE FROM questions WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM providers WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM schedules WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM bookings WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM appointment_types WHERE organiser_id = 'org_seed'`;
 
   _schemaReady = true;
 }
