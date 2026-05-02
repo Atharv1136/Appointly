@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db, ensureSchema } from "./db.server";
-import { findAppt } from "./services-catalog.server";
+import { dbFindAppt } from "./db.server";
 import { readSession } from "./auth.server";
 import { sendEmail, bookingConfirmationHtml } from "./email.server";
 import crypto from "crypto";
@@ -20,7 +20,7 @@ export const getSlots = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<{ slots: SlotInfo[] }> => {
     await ensureSchema();
-    const appt = findAppt(data.appointmentTypeId);
+    const appt = await dbFindAppt(data.appointmentTypeId);
     if (!appt) throw new Error("Service not found");
     const date = new Date(data.dateISO);
     const [sh, sm] = appt.workingHours.start.split(":").map(Number);
@@ -87,7 +87,7 @@ export const createBookingFn = createServerFn({ method: "POST" })
   .inputValidator((d) => bookingInputSchema.parse(d))
   .handler(async ({ data }) => {
     await ensureSchema();
-    const appt = findAppt(data.appointmentTypeId);
+    const appt = await dbFindAppt(data.appointmentTypeId);
     if (!appt) throw new Error("Service not found");
     const provider = appt.providers.find((p) => p.id === data.providerId);
     if (!provider) throw new Error("Provider not found");
@@ -225,7 +225,7 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         const rows = await tx`SELECT * FROM bookings WHERE id=${data.id} AND customer_id=${sess.sub} FOR UPDATE`;
         if (!rows.length) throw new Error("Booking not found");
         const b = rows[0];
-        const appt = findAppt(b.appointment_type_id);
+        const appt = await dbFindAppt(b.appointment_type_id);
         if (!appt) throw new Error("Service not found");
         const cap = appt.manageCapacity ? appt.maxCapacity : 1;
         const used = await tx`

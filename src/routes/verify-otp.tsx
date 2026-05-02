@@ -53,7 +53,10 @@ function VerifyOtpPage() {
       sessionStorage.removeItem("apt_pending_email");
       setUser(res.user as User);
       toast.success("Account verified!");
-      navigate({ to: "/services" });
+      const role = res.user.role;
+      if (role === "organiser") navigate({ to: "/organiser" });
+      else if (role === "admin") navigate({ to: "/admin" });
+      else navigate({ to: "/services" });
     } catch (err) {
       toast.error((err as Error).message || "Verification failed");
     } finally {

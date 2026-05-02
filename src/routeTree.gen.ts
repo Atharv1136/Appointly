@@ -20,6 +20,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrganiserIndexRouteImport } from './routes/organiser.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as BookIdRouteImport } from './routes/book.$id'
+import { Route as OrganiserServicesNewRouteImport } from './routes/organiser.services.new'
+import { Route as OrganiserServicesIdRouteImport } from './routes/organiser.services.$id'
 
 const VerifyOtpRoute = VerifyOtpRouteImport.update({
   id: '/verify-otp',
@@ -76,6 +78,16 @@ const BookIdRoute = BookIdRouteImport.update({
   path: '/book/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganiserServicesNewRoute = OrganiserServicesNewRouteImport.update({
+  id: '/organiser/services/new',
+  path: '/organiser/services/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganiserServicesIdRoute = OrganiserServicesIdRouteImport.update({
+  id: '/organiser/services/$id',
+  path: '/organiser/services/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +101,8 @@ export interface FileRoutesByFullPath {
   '/book/$id': typeof BookIdRoute
   '/admin/': typeof AdminIndexRoute
   '/organiser/': typeof OrganiserIndexRoute
+  '/organiser/services/$id': typeof OrganiserServicesIdRoute
+  '/organiser/services/new': typeof OrganiserServicesNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +116,8 @@ export interface FileRoutesByTo {
   '/book/$id': typeof BookIdRoute
   '/admin': typeof AdminIndexRoute
   '/organiser': typeof OrganiserIndexRoute
+  '/organiser/services/$id': typeof OrganiserServicesIdRoute
+  '/organiser/services/new': typeof OrganiserServicesNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +132,8 @@ export interface FileRoutesById {
   '/book/$id': typeof BookIdRoute
   '/admin/': typeof AdminIndexRoute
   '/organiser/': typeof OrganiserIndexRoute
+  '/organiser/services/$id': typeof OrganiserServicesIdRoute
+  '/organiser/services/new': typeof OrganiserServicesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +149,8 @@ export interface FileRouteTypes {
     | '/book/$id'
     | '/admin/'
     | '/organiser/'
+    | '/organiser/services/$id'
+    | '/organiser/services/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +164,8 @@ export interface FileRouteTypes {
     | '/book/$id'
     | '/admin'
     | '/organiser'
+    | '/organiser/services/$id'
+    | '/organiser/services/new'
   id:
     | '__root__'
     | '/'
@@ -157,6 +179,8 @@ export interface FileRouteTypes {
     | '/book/$id'
     | '/admin/'
     | '/organiser/'
+    | '/organiser/services/$id'
+    | '/organiser/services/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +195,8 @@ export interface RootRouteChildren {
   BookIdRoute: typeof BookIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   OrganiserIndexRoute: typeof OrganiserIndexRoute
+  OrganiserServicesIdRoute: typeof OrganiserServicesIdRoute
+  OrganiserServicesNewRoute: typeof OrganiserServicesNewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +278,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organiser/services/new': {
+      id: '/organiser/services/new'
+      path: '/organiser/services/new'
+      fullPath: '/organiser/services/new'
+      preLoaderRoute: typeof OrganiserServicesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organiser/services/$id': {
+      id: '/organiser/services/$id'
+      path: '/organiser/services/$id'
+      fullPath: '/organiser/services/$id'
+      preLoaderRoute: typeof OrganiserServicesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +307,8 @@ const rootRouteChildren: RootRouteChildren = {
   BookIdRoute: BookIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   OrganiserIndexRoute: OrganiserIndexRoute,
+  OrganiserServicesIdRoute: OrganiserServicesIdRoute,
+  OrganiserServicesNewRoute: OrganiserServicesNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

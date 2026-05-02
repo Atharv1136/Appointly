@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import crypto from "crypto";
-import { findAppt } from "./services-catalog.server";
+import { dbFindAppt } from "./db.server";
 
 const RAZORPAY_API = "https://api.razorpay.com/v1";
 
@@ -28,7 +28,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const appt = findAppt(data.appointmentTypeId);
+    const appt = await dbFindAppt(data.appointmentTypeId);
     if (!appt) throw new Error("Service not found");
     if (!appt.advancePayment) throw new Error("This service does not require payment");
     const subtotal = appt.paymentAmount * data.capacityCount;
