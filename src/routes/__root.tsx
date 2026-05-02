@@ -39,6 +39,10 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Appointly — The perfect booking system" },
+      { name: "twitter:description", content: "Book appointments in seconds. Discover services, pick a time, and pay securely." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e6f7902b-8702-4194-bb84-8f43937ff467" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e6f7902b-8702-4194-bb84-8f43937ff467" },
     ],
     links: [
       { rel: "icon", type: "image/png", href: "/favicon.png" },
