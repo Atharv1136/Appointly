@@ -1,8 +1,19 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Calendar, LogOut, Menu, User as UserIcon, X } from "lucide-react";
+import { LogOut, Menu, User as UserIcon, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
+import logoImg from "@/assets/appointly-logo.png";
+
+function Logo({ className = "h-9 w-9" }: { className?: string }) {
+  return (
+    <img
+      src={logoImg}
+      alt="Appointly logo"
+      className={`${className} object-contain transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-4deg]`}
+    />
+  );
+}
 
 export function SiteHeader() {
   const { user, logout } = useAuth();
@@ -15,13 +26,11 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur">
+    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Calendar className="h-5 w-5" />
-          </span>
-          <span className="text-base font-semibold tracking-tight">Appointly</span>
+        <Link to="/" className="group flex items-center gap-2.5">
+          <Logo className="h-9 w-9" />
+          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Appointly</span>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -106,10 +115,8 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-muted/40">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-8 sm:px-6 md:flex-row lg:px-8">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Calendar className="h-4 w-4" />
-          </span>
+        <div className="group flex items-center gap-2">
+          <Logo className="h-7 w-7" />
           <span className="text-sm font-medium">Appointly</span>
           <span className="text-sm text-muted-foreground">— The perfect booking system</span>
         </div>
@@ -133,11 +140,9 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       <div className="flex items-center justify-between px-6 py-5">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Calendar className="h-5 w-5" />
-          </span>
-          <span className="text-base font-semibold tracking-tight">Appointly</span>
+        <Link to="/" className="group flex items-center gap-2.5">
+          <Logo className="h-9 w-9" />
+          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Appointly</span>
         </Link>
       </div>
       <div className="flex flex-1 items-center justify-center px-4 pb-12">
