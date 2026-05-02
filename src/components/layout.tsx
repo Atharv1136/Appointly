@@ -10,6 +10,9 @@ function Logo({ className = "h-9 w-9" }: { className?: string }) {
     <img
       src={logoImg}
       alt="Appointly logo"
+      width={36}
+      height={36}
+      decoding="async"
       className={`${className} object-contain transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-4deg]`}
     />
   );

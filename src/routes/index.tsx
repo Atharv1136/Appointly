@@ -62,7 +62,7 @@ function Landing() {
           <div className="relative animate-fade-in delay-200">
             <div className="absolute inset-0 -z-10 rounded-3xl bg-primary/10 blur-3xl animate-float-slow" />
             <img src={heroImg} alt="Calendar with floating appointment slots" width={1536} height={1024} className="rounded-2xl border border-border shadow-elevated transition-transform duration-500 hover:scale-[1.02]" />
-            <img src={logoImg} alt="" aria-hidden className="absolute -left-6 -top-6 hidden h-20 w-20 rounded-2xl bg-background p-2 shadow-elevated animate-float-slow sm:block" />
+            <img src={logoImg} alt="" aria-hidden width={80} height={80} loading="lazy" decoding="async" className="absolute -left-6 -top-6 hidden h-20 w-20 rounded-2xl bg-background p-2 shadow-elevated animate-float-slow sm:block" />
           </div>
         </div>
       </section>
