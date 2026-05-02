@@ -22,6 +22,7 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   if (lovableApiKey) {
     return sendLovableEmail(
       {
+        idempotency_key: crypto.randomUUID(),
         to: opts.to,
         from,
         sender_domain: "notify.atharvbhosale.site",
