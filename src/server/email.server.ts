@@ -18,7 +18,7 @@ function htmlToText(html: string) {
 
 export async function sendEmail(opts: { to: string; subject: string; html: string }) {
   const lovableApiKey = process.env.LOVABLE_API_KEY;
-  const from = process.env.FROM_EMAIL || "Appointly <notify@atharvbhosale.site>";
+  const from = "Appointly <no-reply@notify.atharvbhosale.site>";
   if (lovableApiKey) {
     return sendLovableEmail(
       {
