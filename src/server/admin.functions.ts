@@ -32,9 +32,10 @@ export const adminStats = createServerFn({ method: "GET" }).handler(async () => 
     sql`SELECT COUNT(*)::int AS c FROM bookings WHERE status='cancelled'`,
     sql`SELECT appointment_type_id, capacity_count FROM bookings WHERE payment_status='paid' AND status<>'cancelled'`,
   ]);
-  // Compute revenue from catalog amounts
+  // Compute revenue from DB-backed services
+  const allServices = await dbListAppointmentTypes();
   let revenue = 0;
-  const priceMap = new Map(APPT_TYPES.map((a) => [a.id, a.advancePayment ? a.paymentAmount : 0]));
+  const priceMap = new Map<string, number>(allServices.map((a) => [a.id, a.advancePayment ? a.paymentAmount : 0]));
   for (const r of revenueRows) {
     const p = priceMap.get(r.appointment_type_id) ?? 0;
     revenue += p * Number(r.capacity_count);
@@ -50,7 +51,7 @@ export const adminStats = createServerFn({ method: "GET" }).handler(async () => 
     totalUsers: users[0].c,
     totalOrganisers: organisers[0].c,
     totalCustomers: customers[0].c,
-    totalServices: APPT_TYPES.length,
+    totalServices: allServices.length,
     totalBookings: bookings[0].c,
     confirmedBookings: confirmed[0].c,
     pendingBookings: pending[0].c,
