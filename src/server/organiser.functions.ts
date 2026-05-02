@@ -1,0 +1,226 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import crypto from "crypto";
+import { db, ensureSchema, dbFindAppt, dbListAppointmentTypes } from "./db.server";
+import { readSession } from "./auth.server";
+
+async function requireOrganiser() {
+  const sess = await readSession();
+  if (!sess) throw new Error("Not authenticated");
+  if (sess.role !== "organiser" && sess.role !== "admin") throw new Error("Organiser access required");
+  return sess;
+}
+
+async function ownsService(serviceId: string, organiserId: string, role: string) {
+  if (role === "admin") return true;
+  const sql = db();
+  const rows = await sql`SELECT organiser_id FROM appointment_types WHERE id=${serviceId}`;
+  if (!rows.length) throw new Error("Service not found");
+  if (rows[0].organiser_id !== organiserId) throw new Error("Not allowed");
+  return true;
+}
+
+export const listMyServices = createServerFn({ method: "GET" }).handler(async () => {
+  const sess = await requireOrganiser();
+  const services = sess.role === "admin"
+    ? await dbListAppointmentTypes()
+    : await dbListAppointmentTypes({ organiserId: sess.sub });
+  return { services };
+});
+
+export const getMyService = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.id, sess.sub, sess.role);
+    const service = await dbFindAppt(data.id);
+    if (!service) throw new Error("Service not found");
+    return { service };
+  });
+
+const serviceInputSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().max(2000).default(""),
+  category: z.string().max(60).default("General"),
+  organiserLabel: z.string().max(120).default(""),
+  durationMins: z.number().int().min(5).max(480),
+  currency: z.string().min(1).max(8).default("INR"),
+  manageCapacity: z.boolean().default(false),
+  maxCapacity: z.number().int().min(1).max(500).default(1),
+  advancePayment: z.boolean().default(false),
+  paymentAmount: z.number().int().min(0).max(10_000_000).default(0),
+  manualConfirm: z.boolean().default(false),
+  workingStart: z.string().regex(/^\d{2}:\d{2}$/),
+  workingEnd: z.string().regex(/^\d{2}:\d{2}$/),
+  minLeadMins: z.number().int().min(0).max(60 * 24 * 30).default(60),
+  maxAdvanceDays: z.number().int().min(1).max(365).default(60),
+  bufferMins: z.number().int().min(0).max(240).default(0),
+  isPublished: z.boolean().default(true),
+});
+
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "service";
+}
+
+export const createService = createServerFn({ method: "POST" })
+  .inputValidator((d) => serviceInputSchema.parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    const sql = db();
+    const id = slugify(data.title) + "-" + crypto.randomBytes(3).toString("hex");
+    const orgLabel = data.organiserLabel || sess.name;
+    await sql`
+      INSERT INTO appointment_types
+        (id, organiser_id, title, description, category, organiser_label,
+         duration_mins, currency, manage_capacity, max_capacity,
+         advance_payment, payment_amount, manual_confirm,
+         working_start, working_end, min_lead_mins, max_advance_days, buffer_mins, is_published)
+      VALUES
+        (${id}, ${sess.sub}, ${data.title}, ${data.description}, ${data.category}, ${orgLabel},
+         ${data.durationMins}, ${data.currency}, ${data.manageCapacity}, ${data.maxCapacity},
+         ${data.advancePayment}, ${data.paymentAmount}, ${data.manualConfirm},
+         ${data.workingStart}, ${data.workingEnd}, ${data.minLeadMins}, ${data.maxAdvanceDays}, ${data.bufferMins}, ${data.isPublished})
+    `;
+    // Default provider = the organiser themselves
+    const initials = sess.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "OR";
+    await sql`
+      INSERT INTO providers (id, appointment_type_id, name, title, initials, sort_order)
+      VALUES (${"prv_" + crypto.randomUUID()}, ${id}, ${sess.name}, 'Provider', ${initials}, 0)
+    `;
+    return { id };
+  });
+
+export const updateService = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80) }).extend(serviceInputSchema.shape).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.id, sess.sub, sess.role);
+    const sql = db();
+    await sql`
+      UPDATE appointment_types SET
+        title=${data.title}, description=${data.description}, category=${data.category},
+        organiser_label=${data.organiserLabel || sess.name},
+        duration_mins=${data.durationMins}, currency=${data.currency},
+        manage_capacity=${data.manageCapacity}, max_capacity=${data.maxCapacity},
+        advance_payment=${data.advancePayment}, payment_amount=${data.paymentAmount},
+        manual_confirm=${data.manualConfirm},
+        working_start=${data.workingStart}, working_end=${data.workingEnd},
+        min_lead_mins=${data.minLeadMins}, max_advance_days=${data.maxAdvanceDays},
+        buffer_mins=${data.bufferMins}, is_published=${data.isPublished}
+      WHERE id=${data.id}
+    `;
+    return { ok: true };
+  });
+
+export const deleteService = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.id, sess.sub, sess.role);
+    const sql = db();
+    await sql`DELETE FROM appointment_types WHERE id=${data.id}`;
+    return { ok: true };
+  });
+
+export const togglePublish = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80), published: z.boolean() }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.id, sess.sub, sess.role);
+    const sql = db();
+    await sql`UPDATE appointment_types SET is_published=${data.published} WHERE id=${data.id}`;
+    return { ok: true };
+  });
+
+// ---- Providers ----
+const providerInput = z.object({
+  serviceId: z.string().min(1).max(80),
+  name: z.string().trim().min(1).max(120),
+  title: z.string().max(120).default(""),
+  initials: z.string().max(4).default(""),
+});
+
+export const addProvider = createServerFn({ method: "POST" })
+  .inputValidator((d) => providerInput.parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    const id = "prv_" + crypto.randomUUID();
+    const inits = (data.initials || data.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("")).toUpperCase();
+    const cnt = await sql`SELECT COUNT(*)::int AS c FROM providers WHERE appointment_type_id=${data.serviceId}`;
+    await sql`
+      INSERT INTO providers (id, appointment_type_id, name, title, initials, sort_order)
+      VALUES (${id}, ${data.serviceId}, ${data.name}, ${data.title}, ${inits}, ${cnt[0].c})
+    `;
+    return { id };
+  });
+
+export const updateProvider = createServerFn({ method: "POST" })
+  .inputValidator((d) => providerInput.extend({ id: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    const inits = (data.initials || data.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("")).toUpperCase();
+    await sql`UPDATE providers SET name=${data.name}, title=${data.title}, initials=${inits} WHERE id=${data.id} AND appointment_type_id=${data.serviceId}`;
+    return { ok: true };
+  });
+
+export const removeProvider = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80), serviceId: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    await sql`DELETE FROM providers WHERE id=${data.id} AND appointment_type_id=${data.serviceId}`;
+    return { ok: true };
+  });
+
+// ---- Questions ----
+const questionInput = z.object({
+  serviceId: z.string().min(1).max(80),
+  label: z.string().trim().min(1).max(200),
+  type: z.enum(["text", "textarea", "select"]).default("text"),
+  options: z.array(z.string().max(80)).max(20).default([]),
+  required: z.boolean().default(false),
+});
+
+export const addQuestion = createServerFn({ method: "POST" })
+  .inputValidator((d) => questionInput.parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    const id = "q_" + crypto.randomUUID();
+    const cnt = await sql`SELECT COUNT(*)::int AS c FROM questions WHERE appointment_type_id=${data.serviceId}`;
+    await sql`
+      INSERT INTO questions (id, appointment_type_id, label, field_type, options_json, required, sort_order)
+      VALUES (${id}, ${data.serviceId}, ${data.label}, ${data.type}, ${sql.json(data.options)}, ${data.required}, ${cnt[0].c})
+    `;
+    return { id };
+  });
+
+export const updateQuestion = createServerFn({ method: "POST" })
+  .inputValidator((d) => questionInput.extend({ id: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    await sql`
+      UPDATE questions
+      SET label=${data.label}, field_type=${data.type}, options_json=${sql.json(data.options)}, required=${data.required}
+      WHERE id=${data.id} AND appointment_type_id=${data.serviceId}
+    `;
+    return { ok: true };
+  });
+
+export const removeQuestion = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(80), serviceId: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const sess = await requireOrganiser();
+    await ownsService(data.serviceId, sess.sub, sess.role);
+    const sql = db();
+    await sql`DELETE FROM questions WHERE id=${data.id} AND appointment_type_id=${data.serviceId}`;
+    return { ok: true };
+  });
