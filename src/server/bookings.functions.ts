@@ -363,8 +363,8 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         const appt = await dbFindAppt(b.appointment_type_id);
         if (!appt) throw new Error("Service not found");
         const cap = appt.manageCapacity ? appt.maxCapacity : 1;
-        const used = await tx`
-          SELECT COALESCE(SUM(capacity_count),0)::int AS used
+        const usedRows = await tx`
+          SELECT capacity_count
           FROM bookings
           WHERE id <> ${data.id}
             AND appointment_type_id=${b.appointment_type_id}
@@ -373,7 +373,8 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
             AND status <> 'cancelled'
           FOR UPDATE
         `;
-        if (Number(used[0]?.used ?? 0) + Number(b.capacity_count) > cap) throw new Error("DOUBLE_BOOKING");
+        const usedNum = usedRows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
+        if (usedNum + Number(b.capacity_count) > cap) throw new Error("DOUBLE_BOOKING");
         await tx`UPDATE bookings SET slot_start=${slotStart} WHERE id=${data.id}`;
       });
       const ctx = await emailContextForBooking(data.id);
