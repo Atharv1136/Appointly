@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, Briefcase, Calendar, CheckCircle2, Clock, Layers, XCircle } from "lucide-react";
+import { Activity, Briefcase, Calendar, CheckCircle2, Clock, Edit, Eye, EyeOff, Layers, Plus, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { RoleGuard } from "@/components/role-guard";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { adminListBookings, adminUpdateBookingStatus, organiserStats } from "@/server/admin.functions";
 import { listServices } from "@/server/services.functions";
+import { listMyServices, togglePublish, deleteService } from "@/server/organiser.functions";
 import type { AppointmentType } from "@/lib/types";
 
 export const Route = createFileRoute("/organiser/")({
