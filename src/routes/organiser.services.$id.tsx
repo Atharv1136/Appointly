@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, Link2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { RoleGuard } from "@/components/role-guard";
@@ -15,6 +15,7 @@ import {
   getMyService, updateService, deleteService, togglePublish,
   addProvider, updateProvider, removeProvider,
   addQuestion, updateQuestion, removeQuestion,
+  generateShareToken,
 } from "@/server/organiser.functions";
 
 export const Route = createFileRoute("/organiser/services/$id")({
@@ -103,6 +104,8 @@ function EditServicePage() {
 
         <h1 className="mb-1 text-2xl font-semibold">{svc.title}</h1>
         <p className="mb-6 text-sm text-muted-foreground">Configure how customers see and book this service.</p>
+
+        <ShareLinkCard service={svc} onChange={load} />
 
         <Tabs defaultValue="details" className="space-y-6">
           <TabsList>
