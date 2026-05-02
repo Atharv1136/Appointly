@@ -67,7 +67,186 @@ export async function ensureSchema() {
     ON bookings (appointment_type_id, provider_id, slot_start)
     WHERE status <> 'cancelled'
   `;
+
+  // Organiser-managed appointment types
+  await sql`
+    CREATE TABLE IF NOT EXISTS appointment_types (
+      id                TEXT PRIMARY KEY,
+      organiser_id      TEXT NOT NULL,
+      title             TEXT NOT NULL,
+      description       TEXT NOT NULL DEFAULT '',
+      category          TEXT NOT NULL DEFAULT 'General',
+      organiser_label   TEXT NOT NULL DEFAULT '',
+      duration_mins     INT  NOT NULL DEFAULT 30,
+      currency          TEXT NOT NULL DEFAULT 'INR',
+      manage_capacity   BOOLEAN NOT NULL DEFAULT FALSE,
+      max_capacity      INT  NOT NULL DEFAULT 1,
+      advance_payment   BOOLEAN NOT NULL DEFAULT FALSE,
+      payment_amount    INT  NOT NULL DEFAULT 0,
+      manual_confirm    BOOLEAN NOT NULL DEFAULT FALSE,
+      working_start     TEXT NOT NULL DEFAULT '09:00',
+      working_end       TEXT NOT NULL DEFAULT '17:00',
+      min_lead_mins     INT  NOT NULL DEFAULT 60,
+      max_advance_days  INT  NOT NULL DEFAULT 60,
+      buffer_mins       INT  NOT NULL DEFAULT 0,
+      is_published      BOOLEAN NOT NULL DEFAULT TRUE,
+      share_token       TEXT,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS appt_types_org_idx ON appointment_types (organiser_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS appt_types_pub_idx ON appointment_types (is_published)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS providers (
+      id                   TEXT PRIMARY KEY,
+      appointment_type_id  TEXT NOT NULL REFERENCES appointment_types(id) ON DELETE CASCADE,
+      name                 TEXT NOT NULL,
+      title                TEXT NOT NULL DEFAULT '',
+      initials             TEXT NOT NULL DEFAULT '',
+      sort_order           INT  NOT NULL DEFAULT 0,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS providers_appt_idx ON providers (appointment_type_id)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS questions (
+      id                   TEXT PRIMARY KEY,
+      appointment_type_id  TEXT NOT NULL REFERENCES appointment_types(id) ON DELETE CASCADE,
+      label                TEXT NOT NULL,
+      field_type           TEXT NOT NULL DEFAULT 'text',
+      options_json         JSONB NOT NULL DEFAULT '[]'::jsonb,
+      required             BOOLEAN NOT NULL DEFAULT FALSE,
+      sort_order           INT  NOT NULL DEFAULT 0
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS questions_appt_idx ON questions (appointment_type_id)`;
+
+  // Seed legacy catalog if empty
+  const seeded = await sql`SELECT COUNT(*)::int AS c FROM appointment_types`;
+  if (Number(seeded[0].c) === 0) {
+    const { APPT_TYPES } = await import("./services-catalog.server");
+    for (const a of APPT_TYPES) {
+      await sql`
+        INSERT INTO appointment_types
+          (id, organiser_id, title, description, category, organiser_label,
+           duration_mins, currency, manage_capacity, max_capacity,
+           advance_payment, payment_amount, manual_confirm,
+           working_start, working_end)
+        VALUES
+          (${a.id}, 'org_seed', ${a.title}, ${a.description}, ${a.category}, ${a.organiser},
+           ${a.durationMins}, ${a.currency}, ${a.manageCapacity}, ${a.maxCapacity},
+           ${a.advancePayment}, ${a.paymentAmount}, ${a.manualConfirm},
+           ${a.workingHours.start}, ${a.workingHours.end})
+        ON CONFLICT (id) DO NOTHING
+      `;
+      for (let i = 0; i < a.providers.length; i++) {
+        const p = a.providers[i];
+        await sql`
+          INSERT INTO providers (id, appointment_type_id, name, title, initials, sort_order)
+          VALUES (${p.id}, ${a.id}, ${p.name}, ${p.title}, ${p.initials}, ${i})
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
+      for (let i = 0; i < a.questions.length; i++) {
+        const q = a.questions[i];
+        await sql`
+          INSERT INTO questions (id, appointment_type_id, label, field_type, options_json, required, sort_order)
+          VALUES (${q.id + "_" + a.id}, ${a.id}, ${q.label}, ${q.type}, ${sql.json(q.options ?? [])}, ${q.required}, ${i})
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
+    }
+  }
+
   _schemaReady = true;
+}
+
+// ---- DB-backed service repository ----
+export type DbAppointmentType = {
+  id: string;
+  title: string;
+  description: string;
+  durationMins: number;
+  organiser: string;
+  organiserId: string;
+  category: string;
+  providers: { id: string; name: string; title: string; initials: string }[];
+  manageCapacity: boolean;
+  maxCapacity: number;
+  advancePayment: boolean;
+  paymentAmount: number;
+  currency: string;
+  manualConfirm: boolean;
+  questions: { id: string; label: string; type: "text" | "textarea" | "select"; options?: string[]; required: boolean }[];
+  workingHours: { start: string; end: string };
+  isPublished: boolean;
+  minLeadMins: number;
+  maxAdvanceDays: number;
+  bufferMins: number;
+};
+
+function rowToAppt(row: any, providers: any[], questions: any[]): DbAppointmentType {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? "",
+    durationMins: Number(row.duration_mins),
+    organiser: row.organiser_label ?? "",
+    organiserId: row.organiser_id,
+    category: row.category ?? "General",
+    providers: providers.map((p) => ({ id: p.id, name: p.name, title: p.title ?? "", initials: p.initials ?? "" })),
+    manageCapacity: !!row.manage_capacity,
+    maxCapacity: Number(row.max_capacity),
+    advancePayment: !!row.advance_payment,
+    paymentAmount: Number(row.payment_amount),
+    currency: row.currency,
+    manualConfirm: !!row.manual_confirm,
+    questions: questions.map((q) => ({
+      id: q.id,
+      label: q.label,
+      type: q.field_type as "text" | "textarea" | "select",
+      options: Array.isArray(q.options_json) ? q.options_json : [],
+      required: !!q.required,
+    })),
+    workingHours: { start: row.working_start, end: row.working_end },
+    isPublished: !!row.is_published,
+    minLeadMins: Number(row.min_lead_mins),
+    maxAdvanceDays: Number(row.max_advance_days),
+    bufferMins: Number(row.buffer_mins),
+  };
+}
+
+export async function dbListAppointmentTypes(opts: { organiserId?: string; publishedOnly?: boolean } = {}): Promise<DbAppointmentType[]> {
+  await ensureSchema();
+  const sql = db();
+  const rows = opts.organiserId
+    ? await sql`SELECT * FROM appointment_types WHERE organiser_id=${opts.organiserId} ORDER BY created_at DESC`
+    : opts.publishedOnly
+    ? await sql`SELECT * FROM appointment_types WHERE is_published=TRUE ORDER BY created_at DESC`
+    : await sql`SELECT * FROM appointment_types ORDER BY created_at DESC`;
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id);
+  const provs = await sql`SELECT * FROM providers WHERE appointment_type_id IN ${sql(ids)} ORDER BY sort_order`;
+  const qs = await sql`SELECT * FROM questions WHERE appointment_type_id IN ${sql(ids)} ORDER BY sort_order`;
+  return rows.map((r) =>
+    rowToAppt(
+      r,
+      provs.filter((p) => p.appointment_type_id === r.id),
+      qs.filter((q) => q.appointment_type_id === r.id),
+    ),
+  );
+}
+
+export async function dbFindAppt(id: string): Promise<DbAppointmentType | null> {
+  await ensureSchema();
+  const sql = db();
+  const rows = await sql`SELECT * FROM appointment_types WHERE id=${id}`;
+  if (!rows.length) return null;
+  const provs = await sql`SELECT * FROM providers WHERE appointment_type_id=${id} ORDER BY sort_order`;
+  const qs = await sql`SELECT * FROM questions WHERE appointment_type_id=${id} ORDER BY sort_order`;
+  return rowToAppt(rows[0], provs, qs);
 }
 
 
