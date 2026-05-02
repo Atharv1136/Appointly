@@ -1,23 +1,22 @@
 // Server-only Neon/Postgres client + schema bootstrap.
+// IMPORTANT: Cloudflare Workers forbid sharing I/O objects (sockets, streams)
+// across requests. We create a fresh postgres client per call instead of caching.
 import postgres from "postgres";
 
-let _sql: ReturnType<typeof postgres> | null = null;
-let _initPromise: Promise<void> | null = null;
-
 export function db() {
-  if (!_sql) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not configured");
-    _sql = postgres(url, {
-      ssl: "require",
-      max: 5,
-      idle_timeout: 20,
-      connect_timeout: 10,
-      prepare: false, // Neon pooler compatibility
-    });
-  }
-  return _sql;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not configured");
+  return postgres(url, {
+    ssl: "require",
+    max: 1,
+    idle_timeout: 5,
+    connect_timeout: 10,
+    prepare: false, // Neon pooler compatibility
+  });
 }
+
+let _schemaReady = false;
+
 
 export async function ensureSchema() {
   if (_initPromise) return _initPromise;
