@@ -5,6 +5,7 @@ import { AuthShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { requestPasswordReset } from "@/server/auth.functions";
 
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({ meta: [{ title: "Forgot password — Appointly" }] }),
@@ -14,11 +15,18 @@ export const Route = createFileRoute("/forgot-password")({
 function ForgotPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    setSent(true);
+    setLoading(true);
+    try {
+      await requestPasswordReset({ data: { email } });
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (sent) {
@@ -46,7 +54,7 @@ function ForgotPage() {
           <Label htmlFor="email">Email</Label>
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </div>
-        <Button type="submit" className="w-full">Send reset link</Button>
+        <Button type="submit" className="w-full" disabled={loading}>{loading ? "Sending..." : "Send reset link"}</Button>
       </form>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Remembered? <Link to="/login" className="font-medium text-primary hover:underline">Log in</Link>

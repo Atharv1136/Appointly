@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { PageShell } from "@/components/layout";
 import { Input } from "@/components/ui/input";
-import { getAppointmentTypes } from "@/lib/store";
+import { listServices } from "@/server/services.functions";
+import type { AppointmentType } from "@/lib/types";
 
 export const Route = createFileRoute("/services")({
   head: () => ({
@@ -14,12 +15,18 @@ export const Route = createFileRoute("/services")({
       { property: "og:description", content: "Browse all bookable services and book in seconds." },
     ],
   }),
+  loader: async () => {
+    const { services } = await listServices();
+    return { services };
+  },
   component: ServicesPage,
 });
 
 function ServicesPage() {
-  const all = getAppointmentTypes();
+  const { services } = Route.useLoaderData();
   const [q, setQ] = useState("");
+  const [all] = useState<AppointmentType[]>(services as AppointmentType[]);
+  useEffect(() => {}, []);
   const filtered = all.filter(
     (s) =>
       s.title.toLowerCase().includes(q.toLowerCase()) ||
