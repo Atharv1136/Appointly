@@ -15,6 +15,7 @@ import {
   getMyService, updateService, deleteService, togglePublish,
   addProvider, updateProvider, removeProvider,
   addQuestion, updateQuestion, removeQuestion,
+  generateShareToken,
 } from "@/server/organiser.functions";
 
 export const Route = createFileRoute("/organiser/services/$id")({
