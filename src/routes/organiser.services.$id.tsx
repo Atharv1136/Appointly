@@ -19,7 +19,7 @@ import {
 } from "@/server/organiser.functions";
 
 export const Route = createFileRoute("/organiser/services/$id")({
-  head: () => ({ meta: [{ title: "Edit service — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Edit service — CalenSync" }] }),
   component: () => (
     <RoleGuard allow={["organiser", "admin"]}>
       <EditServicePage />

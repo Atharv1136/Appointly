@@ -11,7 +11,7 @@ import { loginFn } from "@/server/auth.functions";
 import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Log in — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Log in — CalenSync" }] }),
   validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
     redirect: typeof s.redirect === "string" && s.redirect ? s.redirect : undefined,
   }),

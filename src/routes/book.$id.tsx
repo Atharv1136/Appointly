@@ -16,7 +16,7 @@ import { getSlots, createBookingFn, type SlotInfo } from "@/server/bookings.func
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
 
 export const Route = createFileRoute("/book/$id")({
-  head: () => ({ meta: [{ title: "Book appointment — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Book appointment — CalenSync" }] }),
   validateSearch: (s: Record<string, unknown>): { token?: string } =>
     typeof s.token === "string" && s.token ? { token: s.token } : {},
   loaderDeps: ({ search }) => ({ token: search.token }),

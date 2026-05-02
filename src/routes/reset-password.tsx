@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { resetPassword } from "@/server/auth.functions";
 
 export const Route = createFileRoute("/reset-password")({
-  head: () => ({ meta: [{ title: "Set a new password — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Set a new password — CalenSync" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     token: typeof s.token === "string" ? s.token : "",
   }),

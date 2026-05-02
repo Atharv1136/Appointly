@@ -9,9 +9,9 @@ import type { AppointmentType } from "@/lib/types";
 export const Route = createFileRoute("/services")({
   head: () => ({
     meta: [
-      { title: "Browse services — Appointly" },
+      { title: "Browse services — CalenSync" },
       { name: "description", content: "Browse all bookable services and pick a time that works for you." },
-      { property: "og:title", content: "Browse services — Appointly" },
+      { property: "og:title", content: "Browse services — CalenSync" },
       { property: "og:description", content: "Browse all bookable services and book in seconds." },
     ],
   }),
