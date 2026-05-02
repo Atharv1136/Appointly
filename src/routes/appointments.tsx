@@ -205,6 +205,11 @@ function BookingCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {booking.paymentStatus === "paid" && (
+            <Button size="sm" variant="outline" onClick={printReceipt}>
+              <Printer className="h-3.5 w-3.5" /> Print receipt
+            </Button>
+          )}
           {past ? (
             <Button asChild size="sm" variant="outline">
               <Link to="/book/$id" params={{ id: booking.appointmentTypeId }}>Book again</Link>
