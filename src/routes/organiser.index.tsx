@@ -165,27 +165,72 @@ function BookingsTab() {
   );
 }
 
+type MyService = Awaited<ReturnType<typeof listMyServices>>["services"][number];
+
 function ServicesTab() {
-  const [services, setServices] = useState<AppointmentType[]>([]);
-  useEffect(() => { listServices().then((r) => setServices(r.services as AppointmentType[])); }, []);
+  const [services, setServices] = useState<MyService[]>([]);
+  const refresh = () => listMyServices().then((r) => setServices(r.services)).catch((e) => toast.error((e as Error).message));
+  useEffect(() => { refresh(); }, []);
+
+  const onTogglePublish = async (id: string, current: boolean) => {
+    try { await togglePublish({ data: { id, published: !current } }); refresh(); }
+    catch (e) { toast.error((e as Error).message); }
+  };
+  const onDelete = async (id: string) => {
+    if (!confirm("Delete this service?")) return;
+    try { await deleteService({ data: { id } }); toast.success("Deleted"); refresh(); }
+    catch (e) { toast.error((e as Error).message); }
+  };
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {services.map((s) => (
-        <div key={s.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <div className="mb-2 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.category}</span>
-          </div>
-          <h3 className="font-semibold">{s.title}</h3>
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{s.description}</p>
-          <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
-            <div>Duration: <span className="font-medium text-foreground">{s.durationMins} min</span></div>
-            <div>Hours: <span className="font-medium text-foreground">{s.workingHours.start}–{s.workingHours.end}</span></div>
-            <div>Providers: <span className="font-medium text-foreground">{s.providers.length}</span></div>
-            {s.advancePayment && <div>Price: <span className="font-medium text-foreground">₹{s.paymentAmount}</span></div>}
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{services.length} service{services.length === 1 ? "" : "s"}</p>
+        <Button asChild><Link to="/organiser/services/new"><Plus className="mr-1 h-4 w-4" />New service</Link></Button>
+      </div>
+      {services.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+          <Layers className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <h3 className="mb-1 font-semibold">No services yet</h3>
+          <p className="mb-4 text-sm text-muted-foreground">Create your first service to start taking bookings.</p>
+          <Button asChild><Link to="/organiser/services/new"><Plus className="mr-1 h-4 w-4" />Create service</Link></Button>
         </div>
-      ))}
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {services.map((s) => (
+            <div key={s.id} className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.category}</span>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${s.isPublished ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+                  {s.isPublished ? "Live" : "Draft"}
+                </span>
+              </div>
+              <h3 className="font-semibold">{s.title}</h3>
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{s.description || "—"}</p>
+              <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
+                <div>Duration: <span className="font-medium text-foreground">{s.durationMins} min</span></div>
+                <div>Hours: <span className="font-medium text-foreground">{s.workingHours.start}–{s.workingHours.end}</span></div>
+                <div>Providers: <span className="font-medium text-foreground">{s.providers.length}</span></div>
+                {s.advancePayment && <div>Price: <span className="font-medium text-foreground">{s.currency} {s.paymentAmount}</span></div>}
+              </div>
+              <div className="mt-4 flex gap-2 border-t border-border pt-4">
+                <Button asChild size="sm" variant="outline" className="flex-1">
+                  <Link to="/organiser/services/$id" params={{ id: s.id }}><Edit className="mr-1 h-3.5 w-3.5" />Edit</Link>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onTogglePublish(s.id, s.isPublished)} title={s.isPublished ? "Unpublish" : "Publish"}>
+                  {s.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onDelete(s.id)} className="text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
