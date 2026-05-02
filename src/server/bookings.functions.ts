@@ -95,7 +95,8 @@ export const createBookingFn = createServerFn({ method: "POST" })
       throw new Error("Payment is required for this service");
     }
     const sess = await readSession();
-    const customerId = sess?.sub ?? "guest_" + data.customerEmail;
+    if (!sess) throw new Error("Not authenticated");
+    const customerId = sess.sub;
 
     const sql = db();
     const slotStart = new Date(data.slotStartISO);
@@ -175,9 +176,9 @@ export const myBookings = createServerFn({ method: "GET" }).handler(async () => 
   const sql = db();
   const rows = await sql`
     SELECT id, appointment_type_id, provider_id, customer_id, customer_name, customer_email,
-           slot_start, capacity_count, status, payment_status, answers, created_at
+           slot_start, capacity_count, status, payment_status, payment_id, razorpay_order_id, answers, created_at
     FROM bookings
-    WHERE customer_id=${sess.sub}
+    WHERE customer_id=${sess.sub} OR lower(customer_email)=lower(${sess.email})
     ORDER BY slot_start DESC
   `;
   return {
@@ -192,6 +193,8 @@ export const myBookings = createServerFn({ method: "GET" }).handler(async () => 
       capacityCount: Number(r.capacity_count),
       status: r.status as "pending" | "confirmed" | "cancelled",
       paymentStatus: r.payment_status as "paid" | "unpaid",
+      paymentId: r.payment_id ?? undefined,
+      razorpayOrderId: r.razorpay_order_id ?? undefined,
       answers: r.answers ?? {},
       createdAt: new Date(r.created_at).toISOString(),
     })),
