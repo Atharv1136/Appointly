@@ -12,6 +12,14 @@ export type User = {
 export type Provider = { id: string; name: string; title: string; initials: string };
 export type Question = { id: string; label: string; type: "text" | "textarea" | "select"; options?: string[]; required: boolean };
 
+export type WeeklySlots = Record<string, { start: string; end: string }[]>;
+export type FlexibleSlots = Record<string, { start: string; end: string }[]>;
+export type ScheduleEntry = {
+  providerId: string;
+  scheduleType: "weekly" | "flexible";
+  slots: WeeklySlots | FlexibleSlots;
+};
+
 export type AppointmentType = {
   id: string;
   title: string;
@@ -28,6 +36,14 @@ export type AppointmentType = {
   manualConfirm: boolean;
   questions: Question[];
   workingHours: { start: string; end: string };
+  isPublished?: boolean;
+  shareToken?: string;
+  kind?: "user" | "resource";
+  assignmentMode?: "manual" | "auto";
+  schedules?: ScheduleEntry[];
+  minLeadMins?: number;
+  maxAdvanceDays?: number;
+  bufferMins?: number;
 };
 
 export type BookingStatus = "pending" | "confirmed" | "cancelled";

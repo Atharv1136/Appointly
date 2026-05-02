@@ -10,8 +10,9 @@ import {
   generateOtp,
   type SessionPayload,
 } from "./auth.server";
-import { sendEmail, otpEmailHtml } from "./email.server";
+import { sendEmail, otpEmailHtml, passwordResetHtml } from "./email.server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export type PublicUser = { id: string; name: string; email: string; role: string; phone?: string };
 
@@ -73,8 +74,9 @@ export const verifyOtp = createServerFn({ method: "POST" })
     }
     await sql`UPDATE users SET verified=TRUE WHERE email=${email}`;
     await sql`DELETE FROM otps WHERE email=${email}`;
-    const users = await sql`SELECT id, name, email, role, phone FROM users WHERE email=${email}`;
+    const users = await sql`SELECT id, name, email, role, phone, COALESCE(is_active, TRUE) AS is_active FROM users WHERE email=${email}`;
     const u = users[0];
+    if (u.is_active === false) throw new Error("Your account has been deactivated. Contact support.");
     const sess: SessionPayload = { sub: u.id, email: u.email, name: u.name, role: u.role };
     await issueSession(sess);
     return { user: { id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone ?? undefined } as PublicUser };
@@ -98,7 +100,6 @@ export const resendOtp = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Hardcoded super-admin credentials (per product owner request)
 const ADMIN_EMAIL = "atharvbhosaletemp00@gmail.com";
 const ADMIN_PASSWORD = "Atharv@1136";
 const ADMIN_ID = "u_admin_root";
@@ -111,7 +112,7 @@ async function ensureAdminUser() {
     await sql`INSERT INTO users (id, name, email, password_hash, role, verified)
               VALUES (${ADMIN_ID}, 'Platform Admin', ${ADMIN_EMAIL}, ${passwordHash}, 'admin', TRUE)`;
   } else {
-    await sql`UPDATE users SET role='admin', verified=TRUE, password_hash=${passwordHash} WHERE email=${ADMIN_EMAIL}`;
+    await sql`UPDATE users SET role='admin', verified=TRUE, password_hash=${passwordHash}, is_active=TRUE WHERE email=${ADMIN_EMAIL}`;
   }
 }
 
@@ -122,7 +123,6 @@ export const loginFn = createServerFn({ method: "POST" })
     const sql = db();
     const email = data.email.toLowerCase();
 
-    // Hardcoded admin shortcut — always works regardless of DB state
     if (email === ADMIN_EMAIL && data.password === ADMIN_PASSWORD) {
       await ensureAdminUser();
       const rows = await sql`SELECT id, name, email, role, phone FROM users WHERE email=${ADMIN_EMAIL}`;
@@ -141,7 +141,6 @@ export const loginFn = createServerFn({ method: "POST" })
     const ok = await verifyPassword(data.password, u.password_hash);
     if (!ok) throw new Error("Invalid email or password");
     if (!u.verified) {
-      // Auto-resend OTP and signal frontend to verify
       const code = generateOtp();
       const codeHash = await bcrypt.hash(code, 8);
       const expires = new Date(Date.now() + 10 * 60 * 1000);
@@ -170,9 +169,14 @@ export const meFn = createServerFn({ method: "GET" }).handler(async () => {
   const sess = await readSession();
   if (!sess) return { user: null };
   const sql = db();
-  const rows = await sql`SELECT id, name, email, role, phone FROM users WHERE id=${sess.sub}`;
+  const rows = await sql`SELECT id, name, email, role, phone, COALESCE(is_active, TRUE) AS is_active FROM users WHERE id=${sess.sub}`;
   if (!rows.length) return { user: null };
   const u = rows[0];
+  // Enforce deactivation: kick the session if the account is no longer active.
+  if (u.is_active === false) {
+    clearSessionCookie();
+    return { user: null };
+  }
   return { user: { id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone ?? undefined } as PublicUser };
 });
 
@@ -190,10 +194,53 @@ export const updateProfile = createServerFn({ method: "POST" })
     return { user: { id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone ?? undefined } as PublicUser };
   });
 
+function sha256(s: string) {
+  return crypto.createHash("sha256").update(s).digest("hex");
+}
+
 export const requestPasswordReset = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ email: z.string().email() }).parse(d))
+  .inputValidator((d) => z.object({ email: z.string().email(), origin: z.string().max(200).optional() }).parse(d))
   .handler(async ({ data }) => {
-    // Stub: always return success to avoid user enumeration
-    console.log("[password-reset] requested for", data.email);
+    await ensureSchema();
+    const sql = db();
+    const email = data.email.toLowerCase();
+    const rows = await sql`SELECT id, name, COALESCE(is_active, TRUE) AS is_active FROM users WHERE email=${email}`;
+    // Always return ok to prevent user enumeration.
+    if (!rows.length || rows[0].is_active === false) return { ok: true };
+    const u = rows[0];
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenHash = sha256(token);
+    const expires = new Date(Date.now() + 30 * 60 * 1000);
+    await sql`
+      INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
+      VALUES (${tokenHash}, ${u.id}, ${expires})
+    `;
+    const origin = data.origin || process.env.PUBLIC_APP_URL || "https://appointly.app";
+    const resetUrl = `${origin.replace(/\/$/, "")}/reset-password?token=${token}`;
+    await sendEmail({
+      to: email,
+      subject: "Reset your Appointly password",
+      html: passwordResetHtml({ name: u.name, resetUrl }),
+      purpose: "auth",
+    });
+    return { ok: true };
+  });
+
+export const resetPassword = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z.object({ token: z.string().min(32).max(200), password: z.string().min(8).max(200) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    await ensureSchema();
+    const sql = db();
+    const tokenHash = sha256(data.token);
+    const rows = await sql`SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash=${tokenHash}`;
+    if (!rows.length) throw new Error("Invalid or expired link");
+    const t = rows[0];
+    if (t.used_at) throw new Error("This link has already been used");
+    if (new Date(t.expires_at).getTime() < Date.now()) throw new Error("This link has expired");
+    const newHash = await hashPassword(data.password);
+    await sql`UPDATE users SET password_hash=${newHash} WHERE id=${t.user_id}`;
+    await sql`UPDATE password_reset_tokens SET used_at=NOW() WHERE token_hash=${tokenHash}`;
     return { ok: true };
   });

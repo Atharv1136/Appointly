@@ -22,7 +22,7 @@ function ForgotPage() {
     if (!email) return;
     setLoading(true);
     try {
-      await requestPasswordReset({ data: { email } });
+      await requestPasswordReset({ data: { email, origin: window.location.origin } });
       setSent(true);
     } finally {
       setLoading(false);
@@ -37,7 +37,7 @@ function ForgotPage() {
             <CheckCircle2 className="h-6 w-6" />
           </div>
           <p className="text-sm text-muted-foreground">
-            If an account exists for <span className="font-medium text-foreground">{email}</span>, we sent a password reset link.
+            If an account exists for <span className="font-medium text-foreground">{email}</span>, we sent a password reset link. It expires in 30 minutes.
           </p>
           <Button asChild variant="ghost" className="mt-6">
             <Link to="/login">Back to login</Link>

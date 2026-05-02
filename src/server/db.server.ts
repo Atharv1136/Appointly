@@ -1,6 +1,5 @@
 // Server-only Neon/Postgres client + schema bootstrap.
-// IMPORTANT: Cloudflare Workers forbid sharing I/O objects (sockets, streams)
-// across requests. We create a fresh postgres client per call instead of caching.
+// Cloudflare Workers forbid sharing I/O objects across requests.
 import postgres from "postgres";
 
 export function db() {
@@ -11,12 +10,11 @@ export function db() {
     max: 1,
     idle_timeout: 5,
     connect_timeout: 10,
-    prepare: false, // Neon pooler compatibility
+    prepare: false,
   });
 }
 
 let _schemaReady = false;
-
 
 export async function ensureSchema() {
   if (_schemaReady) return;
@@ -68,7 +66,6 @@ export async function ensureSchema() {
     WHERE status <> 'cancelled'
   `;
 
-  // Organiser-managed appointment types
   await sql`
     CREATE TABLE IF NOT EXISTS appointment_types (
       id                TEXT PRIMARY KEY,
@@ -91,11 +88,17 @@ export async function ensureSchema() {
       buffer_mins       INT  NOT NULL DEFAULT 0,
       is_published      BOOLEAN NOT NULL DEFAULT TRUE,
       share_token       TEXT,
+      kind              TEXT NOT NULL DEFAULT 'user',
+      assignment_mode   TEXT NOT NULL DEFAULT 'manual',
       created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE appointment_types ADD COLUMN IF NOT EXISTS share_token TEXT`;
+  await sql`ALTER TABLE appointment_types ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'user'`;
+  await sql`ALTER TABLE appointment_types ADD COLUMN IF NOT EXISTS assignment_mode TEXT NOT NULL DEFAULT 'manual'`;
   await sql`CREATE INDEX IF NOT EXISTS appt_types_org_idx ON appointment_types (organiser_id)`;
   await sql`CREATE INDEX IF NOT EXISTS appt_types_pub_idx ON appointment_types (is_published)`;
+  await sql`CREATE INDEX IF NOT EXISTS appt_types_share_idx ON appointment_types (share_token)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS providers (
@@ -122,6 +125,30 @@ export async function ensureSchema() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS questions_appt_idx ON questions (appointment_type_id)`;
+
+  // Per-provider weekly/flexible schedules
+  await sql`
+    CREATE TABLE IF NOT EXISTS schedules (
+      id                   TEXT PRIMARY KEY,
+      appointment_type_id  TEXT NOT NULL REFERENCES appointment_types(id) ON DELETE CASCADE,
+      provider_id          TEXT NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+      schedule_type        TEXT NOT NULL DEFAULT 'weekly',
+      slots_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (provider_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS schedules_appt_idx ON schedules (appointment_type_id)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash  TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      expires_at  TIMESTAMPTZ NOT NULL,
+      used_at     TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
   // Seed legacy catalog if empty
   const seeded = await sql`SELECT COUNT(*)::int AS c FROM appointment_types`;
@@ -163,7 +190,12 @@ export async function ensureSchema() {
   _schemaReady = true;
 }
 
-// ---- DB-backed service repository ----
+export type ScheduleRow = {
+  providerId: string;
+  scheduleType: "weekly" | "flexible";
+  slots: Record<string, { start: string; end: string }[]>;
+};
+
 export type DbAppointmentType = {
   id: string;
   title: string;
@@ -185,9 +217,13 @@ export type DbAppointmentType = {
   minLeadMins: number;
   maxAdvanceDays: number;
   bufferMins: number;
+  shareToken?: string;
+  kind: "user" | "resource";
+  assignmentMode: "manual" | "auto";
+  schedules: ScheduleRow[];
 };
 
-function rowToAppt(row: any, providers: any[], questions: any[]): DbAppointmentType {
+function rowToAppt(row: any, providers: any[], questions: any[], schedules: any[]): DbAppointmentType {
   return {
     id: row.id,
     title: row.title,
@@ -215,6 +251,14 @@ function rowToAppt(row: any, providers: any[], questions: any[]): DbAppointmentT
     minLeadMins: Number(row.min_lead_mins),
     maxAdvanceDays: Number(row.max_advance_days),
     bufferMins: Number(row.buffer_mins),
+    shareToken: row.share_token ?? undefined,
+    kind: (row.kind ?? "user") as "user" | "resource",
+    assignmentMode: (row.assignment_mode ?? "manual") as "manual" | "auto",
+    schedules: schedules.map((s) => ({
+      providerId: s.provider_id,
+      scheduleType: s.schedule_type as "weekly" | "flexible",
+      slots: (s.slots_json ?? {}) as Record<string, { start: string; end: string }[]>,
+    })),
   };
 }
 
@@ -230,11 +274,13 @@ export async function dbListAppointmentTypes(opts: { organiserId?: string; publi
   const ids = rows.map((r) => r.id);
   const provs = await sql`SELECT * FROM providers WHERE appointment_type_id IN ${sql(ids)} ORDER BY sort_order`;
   const qs = await sql`SELECT * FROM questions WHERE appointment_type_id IN ${sql(ids)} ORDER BY sort_order`;
+  const scs = await sql`SELECT * FROM schedules WHERE appointment_type_id IN ${sql(ids)}`;
   return rows.map((r) =>
     rowToAppt(
       r,
       provs.filter((p) => p.appointment_type_id === r.id),
       qs.filter((q) => q.appointment_type_id === r.id),
+      scs.filter((s) => s.appointment_type_id === r.id),
     ),
   );
 }
@@ -246,7 +292,14 @@ export async function dbFindAppt(id: string): Promise<DbAppointmentType | null> 
   if (!rows.length) return null;
   const provs = await sql`SELECT * FROM providers WHERE appointment_type_id=${id} ORDER BY sort_order`;
   const qs = await sql`SELECT * FROM questions WHERE appointment_type_id=${id} ORDER BY sort_order`;
-  return rowToAppt(rows[0], provs, qs);
+  const scs = await sql`SELECT * FROM schedules WHERE appointment_type_id=${id}`;
+  return rowToAppt(rows[0], provs, qs, scs);
 }
 
-
+export async function dbFindApptByShareToken(token: string): Promise<DbAppointmentType | null> {
+  await ensureSchema();
+  const sql = db();
+  const rows = await sql`SELECT id FROM appointment_types WHERE share_token=${token}`;
+  if (!rows.length) return null;
+  return dbFindAppt(rows[0].id);
+}
