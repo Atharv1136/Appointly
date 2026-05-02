@@ -49,7 +49,7 @@ export const signupStart = createServerFn({ method: "POST" })
       VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
       ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, purpose=EXCLUDED.purpose, expires_at=EXCLUDED.expires_at, attempts=0
     `;
-    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code) });
+    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
     return { ok: true, email };
   });
 
@@ -94,7 +94,7 @@ export const resendOtp = createServerFn({ method: "POST" })
       VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
       ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, expires_at=EXCLUDED.expires_at, attempts=0
     `;
-    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code) });
+    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
     return { ok: true };
   });
 
@@ -150,7 +150,7 @@ export const loginFn = createServerFn({ method: "POST" })
         VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
         ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, expires_at=EXCLUDED.expires_at, attempts=0
       `;
-      await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code) });
+      await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
       return { needsVerification: true as const, email };
     }
     await issueSession({ sub: u.id, email: u.email, name: u.name, role: u.role });
