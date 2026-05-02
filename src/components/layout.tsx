@@ -45,6 +45,16 @@ export function SiteHeader() {
               My Appointments
             </Link>
           )}
+          {user?.role === "organiser" && (
+            <Link to="/organiser" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground" activeProps={{ className: "text-foreground" }}>
+              Dashboard
+            </Link>
+          )}
+          {user?.role === "admin" && (
+            <Link to="/admin" className="text-sm font-medium text-primary transition-colors hover:text-primary/80" activeProps={{ className: "text-primary" }}>
+              Admin
+            </Link>
+          )}
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
