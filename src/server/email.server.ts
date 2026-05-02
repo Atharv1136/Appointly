@@ -1,11 +1,44 @@
-// Server-only email sender via Resend HTTP API.
+// Server-only email sender via Lovable Emails, with Resend as a local fallback.
+import { sendLovableEmail } from "@lovable.dev/email-js";
+
 const RESEND_URL = "https://api.resend.com/emails";
 
-export async function sendEmail(opts: { to: string; subject: string; html: string }) {
+function htmlToText(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export async function sendEmail(opts: { to: string; subject: string; html: string; purpose?: "auth" | "transactional" }) {
+  const lovableApiKey = process.env.LOVABLE_API_KEY;
+  const from = "Appointly <no-reply@notify.atharvbhosale.site>";
+  if (lovableApiKey) {
+    return sendLovableEmail(
+      {
+        idempotency_key: crypto.randomUUID(),
+        to: opts.to,
+        from,
+        sender_domain: "notify.atharvbhosale.site",
+        subject: opts.subject,
+        html: opts.html,
+        text: htmlToText(opts.html),
+        purpose: "transactional",
+        unsubscribe_token: crypto.randomUUID(),
+      },
+      { apiKey: lovableApiKey },
+    );
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.FROM_EMAIL || "Appointly <onboarding@resend.dev>";
   if (!apiKey) {
-    console.warn("[email] RESEND_API_KEY missing — skipping send", opts.subject);
+    console.warn("[email] LOVABLE_API_KEY/RESEND_API_KEY missing — skipping send", opts.subject);
     return { skipped: true };
   }
   const res = await fetch(RESEND_URL, {

@@ -42,6 +42,8 @@ export type Booking = {
   capacityCount: number;
   status: BookingStatus;
   paymentStatus: "paid" | "unpaid";
+  paymentId?: string;
+  razorpayOrderId?: string;
   answers: Record<string, string>;
   createdAt: string;
 };

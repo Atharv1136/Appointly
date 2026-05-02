@@ -12,7 +12,9 @@ import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in — Appointly" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" ? s.redirect : "" }),
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof s.redirect === "string" && s.redirect ? s.redirect : undefined,
+  }),
   component: LoginPage,
 });
 

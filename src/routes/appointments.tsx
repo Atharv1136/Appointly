@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Clock, MapPin, RotateCw, Trash2, User as UserIcon } from "lucide-react";
+import { CalendarCheck, Clock, MapPin, Printer, RotateCw, Trash2, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -166,6 +166,28 @@ function BookingCard({
 }) {
   const provider = service?.providers.find((p) => p.id === booking.providerId);
   const date = new Date(booking.slotStart);
+  const subtotal = service?.advancePayment ? service.paymentAmount * booking.capacityCount : 0;
+  const tax = Math.round(subtotal * 0.18);
+  const total = subtotal + tax;
+  const printReceipt = () => {
+    const receipt = window.open("", "_blank", "width=720,height=900");
+    if (!receipt) return toast.error("Please allow pop-ups to print the receipt");
+    receipt.document.write(`<!doctype html><html><head><title>Receipt ${booking.id}</title><style>
+      body{font-family:system-ui,sans-serif;margin:0;padding:32px;color:#1f2937} .wrap{max-width:680px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:24px;border-bottom:1px solid #e5e7eb;padding-bottom:20px;margin-bottom:24px}.brand{font-size:24px;font-weight:700;color:#1d4ed8}.muted{color:#6b7280;font-size:13px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding:10px 0}.total{font-weight:700;font-size:18px}.badge{display:inline-block;border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600}@media print{button{display:none}body{padding:0}}
+    </style></head><body><div class="wrap"><div class="top"><div><div class="brand">Appointly</div><div class="muted">Payment receipt</div></div><div><span class="badge">${booking.paymentStatus}</span><div class="muted" style="margin-top:8px">${new Date(booking.createdAt).toLocaleString()}</div></div></div>
+    <div class="row"><span>Receipt / Booking ID</span><strong>${booking.id}</strong></div>
+    <div class="row"><span>Service</span><strong>${service?.title ?? "Appointment"}</strong></div>
+    <div class="row"><span>Customer</span><strong>${booking.customerName}</strong></div>
+    <div class="row"><span>Email</span><strong>${booking.customerEmail}</strong></div>
+    <div class="row"><span>Date & time</span><strong>${date.toLocaleString()}</strong></div>
+    <div class="row"><span>Provider</span><strong>${provider?.name ?? "—"}</strong></div>
+    <div class="row"><span>Payment ID</span><strong>${booking.paymentId ?? "—"}</strong></div>
+    <div class="row"><span>Subtotal</span><strong>₹${subtotal}</strong></div>
+    <div class="row"><span>GST (18%)</span><strong>₹${tax}</strong></div>
+    <div class="row total"><span>Total paid</span><span>₹${total}</span></div>
+    <p class="muted" style="margin-top:24px">This is a computer-generated receipt.</p><button onclick="window.print()" style="margin-top:20px;padding:10px 16px;border:0;border-radius:8px;background:#1d4ed8;color:white;font-weight:600">Print receipt</button></div><script>window.onload=()=>setTimeout(()=>window.print(),250)</script></body></html>`);
+    receipt.document.close();
+  };
 
   return (
     <div className={`rounded-2xl border border-border bg-card p-5 shadow-card ${past ? "opacity-70" : ""}`}>
@@ -183,6 +205,11 @@ function BookingCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {booking.paymentStatus === "paid" && (
+            <Button size="sm" variant="outline" onClick={printReceipt}>
+              <Printer className="h-3.5 w-3.5" /> Print receipt
+            </Button>
+          )}
           {past ? (
             <Button asChild size="sm" variant="outline">
               <Link to="/book/$id" params={{ id: booking.appointmentTypeId }}>Book again</Link>
