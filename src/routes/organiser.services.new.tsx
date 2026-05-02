@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createService } from "@/server/organiser.functions";
 
 export const Route = createFileRoute("/organiser/services/new")({
-  head: () => ({ meta: [{ title: "New service — Appointly" }] }),
+  head: () => ({ meta: [{ title: "New service — CalenSync" }] }),
   component: () => (
     <RoleGuard allow={["organiser", "admin"]}>
       <NewServicePage />

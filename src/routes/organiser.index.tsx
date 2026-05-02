@@ -13,7 +13,7 @@ import { listMyServices, togglePublish, deleteService } from "@/server/organiser
 import type { AppointmentType } from "@/lib/types";
 
 export const Route = createFileRoute("/organiser/")({
-  head: () => ({ meta: [{ title: "Organiser dashboard — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Organiser dashboard — CalenSync" }] }),
   component: () => (
     <RoleGuard allow={["organiser", "admin"]}>
       <OrganiserDashboard />

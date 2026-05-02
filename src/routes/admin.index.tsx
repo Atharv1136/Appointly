@@ -19,7 +19,7 @@ import { listServices } from "@/server/services.functions";
 import type { AppointmentType } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/")({
-  head: () => ({ meta: [{ title: "Admin panel — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Admin panel — CalenSync" }] }),
   component: () => (
     <RoleGuard allow={["admin"]}>
       <AdminPanel />

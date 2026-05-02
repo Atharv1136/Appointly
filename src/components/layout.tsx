@@ -3,13 +3,13 @@ import { useState, type ReactNode } from "react";
 import { LogOut, Menu, User as UserIcon, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
-import logoImg from "@/assets/appointly-logo.png";
+import logoImg from "@/assets/calensync-logo.png";
 
 function Logo({ className = "h-9 w-9" }: { className?: string }) {
   return (
     <img
       src={logoImg}
-      alt="Appointly logo"
+      alt="CalenSync logo"
       width={36}
       height={36}
       decoding="async"
@@ -33,7 +33,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="group flex items-center gap-2.5">
           <Logo className="h-9 w-9" />
-          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Appointly</span>
+          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">CalenSync</span>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -130,10 +130,10 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-8 sm:px-6 md:flex-row lg:px-8">
         <div className="group flex items-center gap-2">
           <Logo className="h-7 w-7" />
-          <span className="text-sm font-medium">Appointly</span>
+          <span className="text-sm font-medium">CalenSync</span>
           <span className="text-sm text-muted-foreground">— The perfect booking system</span>
         </div>
-        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Appointly. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} CalenSync. All rights reserved.</p>
       </div>
     </footer>
   );
@@ -155,7 +155,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <div className="flex items-center justify-between px-6 py-5">
         <Link to="/" className="group flex items-center gap-2.5">
           <Logo className="h-9 w-9" />
-          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Appointly</span>
+          <span className="text-base font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">CalenSync</span>
         </Link>
       </div>
       <div className="flex flex-1 items-center justify-center px-4 pb-12">

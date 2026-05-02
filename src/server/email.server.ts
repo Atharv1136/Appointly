@@ -19,7 +19,7 @@ function htmlToText(html: string) {
 export async function sendEmail(opts: { to: string; subject: string; html: string; purpose?: "auth" | "transactional" }) {
   try {
     const lovableApiKey = process.env.LOVABLE_API_KEY;
-    const from = "Appointly <no-reply@notify.atharvbhosale.site>";
+    const from = "CalenSync <no-reply@notify.atharvbhosale.site>";
     if (lovableApiKey) {
       return await sendLovableEmail(
         {
@@ -62,13 +62,13 @@ function shell(title: string, body: string) {
   return `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1F2937">
     <h2 style="color:#1D4ED8;margin:0 0 12px">${title}</h2>
     ${body}
-    <p style="color:#9CA3AF;font-size:12px;margin-top:32px">— Appointly</p>
+    <p style="color:#9CA3AF;font-size:12px;margin-top:32px">— CalenSync</p>
   </div>`;
 }
 
 export function otpEmailHtml(code: string) {
   return shell("Verify your email", `
-    <p>Use this code to verify your Appointly account:</p>
+    <p>Use this code to verify your CalenSync account:</p>
     <div style="font-size:32px;font-weight:700;letter-spacing:8px;background:#F1F5F9;padding:16px;text-align:center;border-radius:12px;margin:16px 0">${code}</div>
     <p style="color:#6B7280;font-size:14px">This code expires in 10 minutes. If you didn't request it, ignore this email.</p>
   `);
@@ -103,7 +103,7 @@ export function bookingConfirmationHtml(b: BookingEmailFields & { paid: boolean;
       ${b.paid && b.amount ? `<p style="margin:4px 0"><strong>Paid:</strong> ₹${b.amount}</p>` : ""}
       <p style="margin:4px 0;color:#6B7280;font-size:12px">Booking ID: ${b.bookingId}</p>
     </div>
-    <p style="color:#6B7280;font-size:14px">Need to reschedule? Visit your appointments page on Appointly.</p>
+    <p style="color:#6B7280;font-size:14px">Need to reschedule? Visit your appointments page on CalenSync.</p>
   `);
 }
 

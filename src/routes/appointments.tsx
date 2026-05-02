@@ -12,7 +12,7 @@ import { listServices } from "@/server/services.functions";
 import { myBookings, cancelBooking, rescheduleBooking, getSlots, type SlotInfo } from "@/server/bookings.functions";
 
 export const Route = createFileRoute("/appointments")({
-  head: () => ({ meta: [{ title: "My appointments — Appointly" }] }),
+  head: () => ({ meta: [{ title: "My appointments — CalenSync" }] }),
   component: AppointmentsPage,
 });
 
@@ -174,7 +174,7 @@ function BookingCard({
     if (!receipt) return toast.error("Please allow pop-ups to print the receipt");
     receipt.document.write(`<!doctype html><html><head><title>Receipt ${booking.id}</title><style>
       body{font-family:system-ui,sans-serif;margin:0;padding:32px;color:#1f2937} .wrap{max-width:680px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:24px;border-bottom:1px solid #e5e7eb;padding-bottom:20px;margin-bottom:24px}.brand{font-size:24px;font-weight:700;color:#1d4ed8}.muted{color:#6b7280;font-size:13px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding:10px 0}.total{font-weight:700;font-size:18px}.badge{display:inline-block;border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600}@media print{button{display:none}body{padding:0}}
-    </style></head><body><div class="wrap"><div class="top"><div><div class="brand">Appointly</div><div class="muted">Payment receipt</div></div><div><span class="badge">${booking.paymentStatus}</span><div class="muted" style="margin-top:8px">${new Date(booking.createdAt).toLocaleString()}</div></div></div>
+    </style></head><body><div class="wrap"><div class="top"><div><div class="brand">CalenSync</div><div class="muted">Payment receipt</div></div><div><span class="badge">${booking.paymentStatus}</span><div class="muted" style="margin-top:8px">${new Date(booking.createdAt).toLocaleString()}</div></div></div>
     <div class="row"><span>Receipt / Booking ID</span><strong>${booking.id}</strong></div>
     <div class="row"><span>Service</span><strong>${service?.title ?? "Appointment"}</strong></div>
     <div class="row"><span>Customer</span><strong>${booking.customerName}</strong></div>

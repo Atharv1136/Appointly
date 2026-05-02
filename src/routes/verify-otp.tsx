@@ -8,7 +8,7 @@ import { verifyOtp, resendOtp } from "@/server/auth.functions";
 import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/verify-otp")({
-  head: () => ({ meta: [{ title: "Verify OTP — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Verify OTP — CalenSync" }] }),
   component: VerifyOtpPage,
 });
 

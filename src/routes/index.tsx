@@ -5,14 +5,14 @@ import { PageShell } from "@/components/layout";
 import { listServices } from "@/server/services.functions";
 import type { AppointmentType } from "@/lib/types";
 import heroImg from "@/assets/hero-booking.jpg";
-import logoImg from "@/assets/appointly-logo.png";
+import logoImg from "@/assets/calensync-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Appointly — Book appointments in seconds" },
+      { title: "CalenSync — Book appointments in seconds" },
       { name: "description", content: "Discover services, pick a time, and pay securely. The perfect booking system for customers and organisers." },
-      { property: "og:title", content: "Appointly — Book appointments in seconds" },
+      { property: "og:title", content: "CalenSync — Book appointments in seconds" },
       { property: "og:description", content: "Discover services, pick a time, and pay securely." },
     ],
   }),
