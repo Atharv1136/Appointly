@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db, ensureSchema } from "./db.server";
-import { findAppt } from "./services-catalog.server";
+import { dbFindAppt } from "./db.server";
 import { readSession } from "./auth.server";
 import { sendEmail, bookingConfirmationHtml } from "./email.server";
 import crypto from "crypto";
