@@ -20,19 +20,17 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   const lovableApiKey = process.env.LOVABLE_API_KEY;
   const from = "Appointly <no-reply@notify.atharvbhosale.site>";
   if (lovableApiKey) {
-    const purpose = opts.purpose ?? "transactional";
     return sendLovableEmail(
       {
-        run_id: purpose === "auth" ? crypto.randomUUID() : undefined,
-        idempotency_key: purpose === "transactional" ? crypto.randomUUID() : undefined,
+        idempotency_key: crypto.randomUUID(),
         to: opts.to,
         from,
         sender_domain: "notify.atharvbhosale.site",
         subject: opts.subject,
         html: opts.html,
         text: htmlToText(opts.html),
-        purpose,
-        unsubscribe_token: purpose === "transactional" ? crypto.randomUUID() : undefined,
+        purpose: "transactional",
+        unsubscribe_token: crypto.randomUUID(),
       },
       { apiKey: lovableApiKey },
     );
