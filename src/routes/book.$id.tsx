@@ -17,7 +17,8 @@ import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.fu
 
 export const Route = createFileRoute("/book/$id")({
   head: () => ({ meta: [{ title: "Book appointment — Appointly" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ token: typeof s.token === "string" ? s.token : undefined }),
+  validateSearch: (s: Record<string, unknown>): { token?: string } =>
+    typeof s.token === "string" && s.token ? { token: s.token } : {},
   loaderDeps: ({ search }) => ({ token: search.token }),
   loader: async ({ params, deps }) => {
     const { service } = await getService({ data: { id: params.id, shareToken: deps.token } });
