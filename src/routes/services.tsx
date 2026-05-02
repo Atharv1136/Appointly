@@ -59,18 +59,19 @@ function ServicesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((s) => (
+            {filtered.map((s, i) => (
               <Link
                 key={s.id}
                 to="/book/$id"
                 params={{ id: s.id }}
-                className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated"
+                className="card-lift group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card animate-fade-in-up"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">{s.category}</span>
                   <span className="text-xs text-muted-foreground">{s.durationMins} min</span>
                 </div>
-                <h3 className="text-lg font-semibold leading-tight">{s.title}</h3>
+                <h3 className="text-lg font-semibold leading-tight transition-colors group-hover:text-primary">{s.title}</h3>
                 <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{s.description}</p>
                 <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
                   <div>
@@ -82,7 +83,7 @@ function ServicesPage() {
                       </p>
                     )}
                   </div>
-                  <span className="text-sm font-medium text-primary group-hover:underline">Book →</span>
+                  <span className="text-sm font-medium text-primary transition-transform group-hover:translate-x-1">Book →</span>
                 </div>
               </Link>
             ))}
