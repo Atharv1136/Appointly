@@ -105,6 +105,8 @@ function EditServicePage() {
         <h1 className="mb-1 text-2xl font-semibold">{svc.title}</h1>
         <p className="mb-6 text-sm text-muted-foreground">Configure how customers see and book this service.</p>
 
+        <ShareLinkCard service={svc} onChange={load} />
+
         <Tabs defaultValue="details" className="space-y-6">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
