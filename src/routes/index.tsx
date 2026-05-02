@@ -5,6 +5,7 @@ import { PageShell } from "@/components/layout";
 import { listServices } from "@/server/services.functions";
 import type { AppointmentType } from "@/lib/types";
 import heroImg from "@/assets/hero-booking.jpg";
+import logoImg from "@/assets/appointly-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,37 +29,40 @@ function Landing() {
   return (
     <PageShell>
       <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24 lg:px-8 lg:py-28">
+        <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-primary/20 blur-3xl animate-blob" />
+        <div className="pointer-events-none absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-accent/40 blur-3xl animate-blob delay-300" />
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24 lg:px-8 lg:py-28">
           <div className="flex flex-col justify-center">
-            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
+            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary-soft px-3 py-1 text-xs font-medium text-primary animate-fade-in-up">
               <Sparkles className="h-3.5 w-3.5" /> The perfect booking system
             </div>
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Book your next appointment in <span className="text-primary">seconds</span>
+            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl animate-fade-in-up delay-100">
+              Book your next appointment in <span className="bg-gradient-to-r from-primary via-primary to-primary/60 bg-clip-text text-transparent animate-gradient-pan">seconds</span>
             </h1>
-            <p className="mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
+            <p className="mt-5 max-w-xl text-base text-muted-foreground sm:text-lg animate-fade-in-up delay-200">
               Discover services, pick a slot that works for you, and confirm instantly. No phone tag, no waiting — just a clean, modern booking experience.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="h-12 px-6 text-base">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row animate-fade-in-up delay-300">
+              <Button asChild size="lg" className="h-12 px-6 text-base shadow-elevated transition-transform hover:scale-[1.03]">
                 <Link to="/services">
-                  Browse services <ArrowRight className="h-4 w-4" />
+                  Browse services <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-12 px-6 text-base">
                 <Link to="/signup">Create free account</Link>
               </Button>
             </div>
-            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
+            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm text-muted-foreground animate-fade-in-up delay-500">
               <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> Secure payments</div>
               <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /> Instant confirmation</div>
               <div className="flex items-center gap-2"><CalendarCheck className="h-4 w-4 text-primary" /> Easy reschedule</div>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 -z-10 rounded-3xl bg-primary/10 blur-3xl" />
-            <img src={heroImg} alt="Calendar with floating appointment slots" width={1536} height={1024} className="rounded-2xl border border-border shadow-elevated" />
+          <div className="relative animate-fade-in delay-200">
+            <div className="absolute inset-0 -z-10 rounded-3xl bg-primary/10 blur-3xl animate-float-slow" />
+            <img src={heroImg} alt="Calendar with floating appointment slots" width={1536} height={1024} className="rounded-2xl border border-border shadow-elevated transition-transform duration-500 hover:scale-[1.02]" />
+            <img src={logoImg} alt="" aria-hidden className="absolute -left-6 -top-6 hidden h-20 w-20 rounded-2xl bg-background p-2 shadow-elevated animate-float-slow sm:block" />
           </div>
         </div>
       </section>
