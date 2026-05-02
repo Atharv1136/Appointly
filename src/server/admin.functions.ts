@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db, ensureSchema } from "./db.server";
 import { readSession } from "./auth.server";
-import { APPT_TYPES } from "./services-catalog.server";
+import { dbListAppointmentTypes } from "./db.server";
 
 async function requireAdmin() {
   const sess = await readSession();
