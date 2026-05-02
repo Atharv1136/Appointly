@@ -19,9 +19,9 @@ let _schemaReady = false;
 
 
 export async function ensureSchema() {
-  if (_initPromise) return _initPromise;
-  _initPromise = (async () => {
-    const sql = db();
+  if (_schemaReady) return;
+  const sql = db();
+  try {
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id            TEXT PRIMARY KEY,
@@ -35,7 +35,6 @@ export async function ensureSchema() {
         created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
-    // Add is_active for older deployments
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`;
     await sql`
       CREATE TABLE IF NOT EXISTS otps (
@@ -64,12 +63,15 @@ export async function ensureSchema() {
         created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
-    // Index for fast slot lookups
     await sql`
       CREATE INDEX IF NOT EXISTS bookings_slot_idx
       ON bookings (appointment_type_id, provider_id, slot_start)
       WHERE status <> 'cancelled'
     `;
-  })();
-  return _initPromise;
+    _schemaReady = true;
+  } finally {
+    // Release the connection back so it isn't reused across requests
+    await sql.end({ timeout: 1 }).catch(() => {});
+  }
 }
+
