@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { AuthShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { verifyOtp, resendOtp } from "@/server/auth.functions";
+import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/verify-otp")({
   head: () => ({ meta: [{ title: "Verify OTP — Appointly" }] }),
@@ -12,10 +14,16 @@ export const Route = createFileRoute("/verify-otp")({
 
 function VerifyOtpPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { setUser } = useAuth();
+  const [email, setEmail] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [countdown, setCountdown] = useState(60);
+  const [loading, setLoading] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    setEmail(sessionStorage.getItem("apt_pending_email") || "");
+  }, []);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -35,33 +43,44 @@ function VerifyOtpPage() {
     if (e.key === "Backspace" && !digits[i] && i > 0) refs.current[i - 1]?.focus();
   };
 
-  const verify = (e: React.FormEvent) => {
+  const verify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (digits.some((d) => !d)) return toast.error("Enter the 6-digit code");
-    const pending = sessionStorage.getItem("apt_pending_signup");
-    const u = pending ? JSON.parse(pending) : { name: "Friend", email: "user@example.com", role: "customer" };
-    sessionStorage.removeItem("apt_pending_signup");
-    login({ id: "u_" + u.email, name: u.name, email: u.email, role: u.role });
-    toast.success("Account verified!");
-    navigate({ to: "/services" });
+    if (!email) return toast.error("Missing email — please sign up again");
+    setLoading(true);
+    try {
+      const res = await verifyOtp({ data: { email, code: digits.join("") } });
+      sessionStorage.removeItem("apt_pending_email");
+      setUser(res.user as User);
+      toast.success("Account verified!");
+      navigate({ to: "/services" });
+    } catch (err) {
+      toast.error((err as Error).message || "Verification failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const resend = () => {
-    setCountdown(60);
-    setDigits(["", "", "", "", "", ""]);
-    toast.success("New OTP sent");
+  const resend = async () => {
+    if (!email) return;
+    try {
+      await resendOtp({ data: { email } });
+      setCountdown(60);
+      setDigits(["", "", "", "", "", ""]);
+      toast.success("New OTP sent");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   };
 
   return (
-    <AuthShell title="Verify your email" subtitle="We sent a 6-digit code to your inbox">
+    <AuthShell title="Verify your email" subtitle={email ? `We sent a 6-digit code to ${email}` : "We sent a 6-digit code to your inbox"}>
       <form onSubmit={verify} className="space-y-6">
         <div className="flex justify-between gap-2">
           {digits.map((d, i) => (
             <input
               key={i}
-              ref={(el) => {
-                refs.current[i] = el;
-              }}
+              ref={(el) => { refs.current[i] = el; }}
               value={d}
               onChange={(e) => onChange(i, e.target.value)}
               onKeyDown={(e) => onKey(i, e)}
@@ -71,7 +90,7 @@ function VerifyOtpPage() {
             />
           ))}
         </div>
-        <Button type="submit" className="w-full">Verify</Button>
+        <Button type="submit" className="w-full" disabled={loading}>{loading ? "Verifying..." : "Verify"}</Button>
         <p className="text-center text-sm text-muted-foreground">
           {countdown > 0 ? (
             <>Resend in {countdown}s</>

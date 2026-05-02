@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarCheck, CreditCard, Shield, Sparkles, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout";
-import { getAppointmentTypes } from "@/lib/store";
+import { listServices } from "@/server/services.functions";
+import type { AppointmentType } from "@/lib/types";
 import heroImg from "@/assets/hero-booking.jpg";
 
 export const Route = createFileRoute("/")({
@@ -14,15 +15,18 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: "Discover services, pick a time, and pay securely." },
     ],
   }),
+  loader: async () => {
+    const { services } = await listServices();
+    return { services: (services as AppointmentType[]).slice(0, 4) };
+  },
   component: Landing,
 });
 
 function Landing() {
-  const services = getAppointmentTypes().slice(0, 4);
+  const { services } = Route.useLoaderData();
 
   return (
     <PageShell>
-      {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24 lg:px-8 lg:py-28">
           <div className="flex flex-col justify-center">
@@ -54,24 +58,16 @@ function Landing() {
 
           <div className="relative">
             <div className="absolute inset-0 -z-10 rounded-3xl bg-primary/10 blur-3xl" />
-            <img
-              src={heroImg}
-              alt="Calendar with floating appointment slots"
-              width={1536}
-              height={1024}
-              className="rounded-2xl border border-border shadow-elevated"
-            />
+            <img src={heroImg} alt="Calendar with floating appointment slots" width={1536} height={1024} className="rounded-2xl border border-border shadow-elevated" />
           </div>
         </div>
       </section>
 
-      {/* Features */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Everything you need to book</h2>
           <p className="mt-3 text-muted-foreground">Built for customers and organisers. Designed to feel effortless.</p>
         </div>
-
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { icon: CalendarCheck, title: "Smart scheduling", body: "Real-time availability with conflict prevention so you never double-book." },
@@ -92,7 +88,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* Featured services */}
       <section className="bg-muted/40 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between gap-4">
@@ -104,9 +99,8 @@ function Landing() {
               <Link to="/services">View all <ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </div>
-
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {services.map((s) => (
+            {services.map((s: AppointmentType) => (
               <Link
                 key={s.id}
                 to="/book/$id"
@@ -129,7 +123,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="overflow-hidden rounded-3xl border border-border p-10 sm:p-14" style={{ background: "var(--gradient-primary)" }}>
           <div className="grid items-center gap-8 md:grid-cols-2">

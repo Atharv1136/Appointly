@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
+import { loginFn } from "@/server/auth.functions";
+import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in — Appointly" }] }),
@@ -14,27 +16,36 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { login } = useAuth();
+  const { setUser } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      // Mock login — accept any credentials
-      const name = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-      login({ id: "u_" + email, name: name || "Friend", email, role: "customer" });
+    try {
+      const res = await loginFn({ data: { email, password } });
+      if (res.needsVerification) {
+        sessionStorage.setItem("apt_pending_email", res.email);
+        toast.info("Verify your email — we sent a code");
+        navigate({ to: "/verify-otp" });
+        return;
+      }
+      setUser(res.user as User);
       toast.success("Welcome back!");
       navigate({ to: "/services" });
-    }, 500);
+    } catch (err) {
+      toast.error((err as Error).message || "Could not log in");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

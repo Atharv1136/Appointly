@@ -5,6 +5,7 @@ import { AuthShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { signupStart } from "@/server/auth.functions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Sign up — Appointly" }] }),
@@ -20,17 +21,22 @@ function SignupPage() {
   const [role, setRole] = useState<"customer" | "organiser">("customer");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) return toast.error("Please fill all fields");
     if (password.length < 8) return toast.error("Password must be at least 8 characters");
     if (password !== confirm) return toast.error("Passwords don't match");
     setLoading(true);
-    sessionStorage.setItem("apt_pending_signup", JSON.stringify({ name, email, role }));
-    setTimeout(() => {
+    try {
+      const res = await signupStart({ data: { name, email, password, role } });
+      sessionStorage.setItem("apt_pending_email", res.email);
       toast.success("OTP sent to your email");
       navigate({ to: "/verify-otp" });
-    }, 500);
+    } catch (err) {
+      toast.error((err as Error).message || "Could not create account");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

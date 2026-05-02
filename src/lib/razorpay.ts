@@ -1,16 +1,4 @@
-// Razorpay test-mode integration (client-only).
-// In production, the order should be created server-side and the signature verified.
-// For test mode without a backend, we open Checkout directly with the test key.
-
-const RAZORPAY_KEY_STORAGE = "apt_razorpay_test_key";
-
-export function getRazorpayKey(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(RAZORPAY_KEY_STORAGE);
-}
-export function setRazorpayKey(key: string) {
-  localStorage.setItem(RAZORPAY_KEY_STORAGE, key);
-}
+// Razorpay client: opens Checkout using a server-created order.
 
 declare global {
   interface Window {
@@ -32,8 +20,11 @@ function loadScript(src: string): Promise<boolean> {
   });
 }
 
-export type RzpOptions = {
-  amountInINR: number;
+export type RzpCheckoutOpts = {
+  keyId: string;
+  orderId: string;
+  amountPaise: number;
+  currency: string;
   name: string;
   description: string;
   customerName: string;
@@ -41,17 +32,21 @@ export type RzpOptions = {
   customerPhone?: string;
 };
 
-export async function openRazorpayCheckout(opts: RzpOptions): Promise<{ paymentId: string }> {
-  const key = getRazorpayKey();
-  if (!key) throw new Error("Razorpay test key not set");
+export type RzpResult = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+export async function openRazorpayCheckout(opts: RzpCheckoutOpts): Promise<RzpResult> {
   const ok = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
   if (!ok || !window.Razorpay) throw new Error("Failed to load Razorpay");
-
   return new Promise((resolve, reject) => {
     const rzp = new window.Razorpay!({
-      key,
-      amount: Math.round(opts.amountInINR * 100), // paise
-      currency: "INR",
+      key: opts.keyId,
+      order_id: opts.orderId,
+      amount: opts.amountPaise,
+      currency: opts.currency,
       name: opts.name,
       description: opts.description,
       prefill: {
@@ -60,12 +55,8 @@ export async function openRazorpayCheckout(opts: RzpOptions): Promise<{ paymentI
         contact: opts.customerPhone || "",
       },
       theme: { color: "#1D4ED8" },
-      handler: (response: { razorpay_payment_id: string }) => {
-        resolve({ paymentId: response.razorpay_payment_id });
-      },
-      modal: {
-        ondismiss: () => reject(new Error("Payment cancelled")),
-      },
+      handler: (response: RzpResult) => resolve(response),
+      modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
     });
     rzp.open();
   });

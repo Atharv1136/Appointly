@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
@@ -7,69 +7,65 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import {
-  createBooking,
-  DoubleBookingError,
-  getAppointmentType,
-  getAvailableSlots,
-  type Provider,
-} from "@/lib/store";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
-import { getRazorpayKey, openRazorpayCheckout, setRazorpayKey } from "@/lib/razorpay";
+import { openRazorpayCheckout } from "@/lib/razorpay";
+import type { AppointmentType, Provider } from "@/lib/types";
+import { getService } from "@/server/services.functions";
+import { getSlots, createBookingFn, type SlotInfo } from "@/server/bookings.functions";
+import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
 
 export const Route = createFileRoute("/book/$id")({
   head: () => ({ meta: [{ title: "Book appointment — Appointly" }] }),
+  loader: async ({ params }) => {
+    const { service } = await getService({ data: { id: params.id } });
+    return { service };
+  },
   component: BookingPage,
 });
 
 const STEPS = ["Provider", "Date", "Slot", "Details", "Confirm", "Done"];
 
 function BookingPage() {
-  const { id } = Route.useParams();
-  const appt = getAppointmentType(id);
+  const { service } = Route.useLoaderData();
+  const appt = service as AppointmentType;
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [step, setStep] = useState(0);
-  const [provider, setProvider] = useState<Provider | null>(appt?.providers[0] ?? null);
+  const [provider, setProvider] = useState<Provider | null>(appt.providers[0] ?? null);
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return d;
   });
+  const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotIso, setSlotIso] = useState<string | null>(null);
   const [capacity, setCapacity] = useState(1);
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(user?.phone ?? "");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showRzpKey, setShowRzpKey] = useState(false);
-  const [rzpKeyInput, setRzpKeyInput] = useState(getRazorpayKey() ?? "");
 
-  if (!appt) {
-    return (
-      <PageShell>
-        <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-          <h1 className="text-2xl font-semibold">Service not found</h1>
-          <Button asChild className="mt-6"><Link to="/services">Browse services</Link></Button>
-        </div>
-      </PageShell>
-    );
-  }
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setEmail(user.email);
+      if (user.phone) setPhone(user.phone);
+    }
+  }, [user]);
 
-  const slots = useMemo(() => {
-    if (!provider) return [];
-    return getAvailableSlots(appt.id, provider.id, date);
+  // Fetch slots when provider/date changes
+  useEffect(() => {
+    if (!provider) return;
+    setSlotsLoading(true);
+    getSlots({ data: { appointmentTypeId: appt.id, providerId: provider.id, dateISO: date.toISOString() } })
+      .then((r) => setSlots(r.slots))
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false));
   }, [appt.id, provider, date]);
 
   const subtotal = appt.advancePayment ? appt.paymentAmount * capacity : 0;
@@ -79,29 +75,35 @@ function BookingPage() {
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
-  const finalizeBooking = (paid: boolean) => {
+  const finalizeBooking = async (paymentId?: string, razorpayOrderId?: string) => {
     if (!provider || !slotIso) return;
     try {
-      const booking = createBooking({
-        appointmentTypeId: appt.id,
-        providerId: provider.id,
-        customerId: user?.id ?? "guest_" + email,
-        customerName: name,
-        customerEmail: email,
-        slotStart: slotIso,
-        capacityCount: capacity,
-        answers,
-        paymentStatus: paid ? "paid" : "unpaid",
+      const res = await createBookingFn({
+        data: {
+          appointmentTypeId: appt.id,
+          providerId: provider.id,
+          slotStartISO: slotIso,
+          capacityCount: capacity,
+          customerName: name,
+          customerEmail: email,
+          answers,
+          paymentId,
+          razorpayOrderId,
+        },
       });
-      setBookingId(booking.id);
+      setBookingId(res.id);
       setStep(5);
     } catch (e) {
-      if (e instanceof DoubleBookingError) {
-        toast.error(e.message);
+      const msg = (e as Error).message || "Could not complete booking";
+      toast.error(msg);
+      if (msg.includes("no longer available")) {
         setStep(2);
         setSlotIso(null);
-      } else {
-        toast.error("Could not complete booking");
+        // Refresh slots
+        if (provider) {
+          const r = await getSlots({ data: { appointmentTypeId: appt.id, providerId: provider.id, dateISO: date.toISOString() } });
+          setSlots(r.slots);
+        }
       }
     }
   };
@@ -113,41 +115,33 @@ function BookingPage() {
       return;
     }
     if (!appt.advancePayment) {
-      finalizeBooking(false);
-      return;
-    }
-    // Razorpay
-    if (!getRazorpayKey()) {
-      setShowRzpKey(true);
+      await finalizeBooking();
       return;
     }
     setSubmitting(true);
     try {
-      await openRazorpayCheckout({
-        amountInINR: total,
+      const order = await createRazorpayOrder({
+        data: { appointmentTypeId: appt.id, capacityCount: capacity },
+      });
+      const result = await openRazorpayCheckout({
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amountPaise: order.amount,
+        currency: order.currency,
         name: appt.title,
         description: `${appt.organiser} · ${provider!.name}`,
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
       });
+      await verifyRazorpayPayment({ data: result });
       toast.success("Payment successful");
-      finalizeBooking(true);
+      await finalizeBooking(result.razorpay_payment_id, result.razorpay_order_id);
     } catch (e) {
       toast.error((e as Error).message || "Payment failed");
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const saveRzpKey = () => {
-    if (!rzpKeyInput.startsWith("rzp_test_")) {
-      toast.error("Use a Razorpay TEST key (starts with rzp_test_)");
-      return;
-    }
-    setRazorpayKey(rzpKeyInput.trim());
-    setShowRzpKey(false);
-    toast.success("Test key saved. Click Pay again.");
   };
 
   return (
@@ -180,7 +174,6 @@ function BookingPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card sm:p-8">
-          {/* Step 1: Provider */}
           {step === 0 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Choose a provider</h2>
@@ -207,7 +200,6 @@ function BookingPage() {
             </div>
           )}
 
-          {/* Step 2: Date */}
           {step === 1 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Pick a date</h2>
@@ -219,7 +211,6 @@ function BookingPage() {
             </div>
           )}
 
-          {/* Step 3: Slot */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -243,7 +234,9 @@ function BookingPage() {
                 </div>
               )}
 
-              {slots.length === 0 ? (
+              {slotsLoading ? (
+                <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Loading slots...</p>
+              ) : slots.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No slots configured for this day.</p>
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
@@ -280,7 +273,6 @@ function BookingPage() {
             </div>
           )}
 
-          {/* Step 4: Details */}
           {step === 3 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Your details</h2>
@@ -315,7 +307,7 @@ function BookingPage() {
                         <Select value={answers[q.id] ?? ""} onValueChange={(v) => setAnswers({ ...answers, [q.id]: v })}>
                           <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                           <SelectContent>
-                            {q.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                            {q.options?.map((o: string) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       )}
@@ -335,7 +327,6 @@ function BookingPage() {
             </div>
           )}
 
-          {/* Step 5: Confirm + Pay */}
           {step === 4 && (
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               <div className="space-y-4">
@@ -368,14 +359,13 @@ function BookingPage() {
                   )}
                 </div>
                 <Button onClick={submit} className="w-full" disabled={submitting}>
-                  {appt.advancePayment ? <><CreditCard className="h-4 w-4" /> Pay ₹{total}</> : "Confirm booking"}
+                  {submitting ? "Processing..." : appt.advancePayment ? <><CreditCard className="h-4 w-4" /> Pay ₹{total}</> : "Confirm booking"}
                 </Button>
                 <Button variant="ghost" onClick={back} className="w-full">Back</Button>
               </aside>
             </div>
           )}
 
-          {/* Step 6: Done */}
           {step === 5 && bookingId && (
             <div className="flex flex-col items-center text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success/15 text-success">
@@ -390,43 +380,27 @@ function BookingPage() {
                 <Row icon={CalendarCheck} label="Date" value={new Date(slotIso!).toLocaleDateString()} />
                 <Row icon={Clock} label="Time" value={new Date(slotIso!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} />
                 <Row icon={UserIcon} label="Provider" value={provider?.name ?? ""} />
-                <Row icon={MapPin} label="Venue" value={appt.organiser} />
+                <p className="text-xs text-muted-foreground">Booking ID: {bookingId}</p>
               </div>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <Button asChild><Link to="/appointments">View my appointments</Link></Button>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <Button asChild><Link to="/appointments">View appointments</Link></Button>
                 <Button asChild variant="outline"><Link to="/services">Book another</Link></Button>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      <Dialog open={showRzpKey} onOpenChange={setShowRzpKey}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Razorpay test key required</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Paste your Razorpay <span className="font-medium text-foreground">test key</span> (starts with <code className="rounded bg-muted px-1">rzp_test_</code>). It's stored only in your browser.
-          </p>
-          <Input value={rzpKeyInput} onChange={(e) => setRzpKeyInput(e.target.value)} placeholder="rzp_test_xxxxxxxxxxxx" />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowRzpKey(false)}>Cancel</Button>
-            <Button onClick={saveRzpKey}>Save & continue</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PageShell>
   );
 }
 
 function Row({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="flex-1">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className="flex items-center gap-3">
+      <Icon className="h-4 w-4 text-muted-foreground" />
+      <div>
+        <div className="text-xs text-muted-foreground">{label}</div>
         <div className="text-sm font-medium">{value}</div>
       </div>
     </div>
@@ -434,30 +408,35 @@ function Row({ icon: Icon, label, value }: { icon: React.ComponentType<{ classNa
 }
 
 function MiniCalendar({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
-  const [view, setView] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [view, setView] = useState(new Date(value.getFullYear(), value.getMonth(), 1));
+  const today = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
 
-  const firstDay = new Date(view.getFullYear(), view.getMonth(), 1);
-  const lastDay = new Date(view.getFullYear(), view.getMonth() + 1, 0);
-  const startOffset = firstDay.getDay();
-  const days: (Date | null)[] = [];
-  for (let i = 0; i < startOffset; i++) days.push(null);
-  for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(view.getFullYear(), view.getMonth(), d));
+  const monthLabel = view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const firstDay = new Date(view.getFullYear(), view.getMonth(), 1).getDay();
+  const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
 
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="mb-3 flex items-center justify-between">
-        <button onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} className="rounded-md p-1 hover:bg-muted"><ChevronLeft className="h-4 w-4" /></button>
-        <div className="text-sm font-semibold">{view.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
-        <button onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} className="rounded-md p-1 hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
+        <Button variant="ghost" size="icon" onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm font-semibold">{monthLabel}</span>
+        <Button variant="ghost" size="icon" onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i} className="py-1.5">{d}</div>)}
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i} className="py-1">{d}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-1">
-        {days.map((d, i) => {
-          if (!d) return <div key={i} />;
+        {Array.from({ length: firstDay }).map((_, i) => <div key={"e" + i} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const d = new Date(view.getFullYear(), view.getMonth(), i + 1);
           const past = d < today;
           const selected = d.toDateString() === value.toDateString();
           return (
@@ -465,15 +444,15 @@ function MiniCalendar({ value, onChange }: { value: Date; onChange: (d: Date) =>
               key={i}
               disabled={past}
               onClick={() => onChange(d)}
-              className={`aspect-square rounded-md text-sm transition-colors ${
+              className={`aspect-square rounded-lg text-sm transition-colors ${
                 selected
-                  ? "bg-primary text-primary-foreground font-semibold"
+                  ? "bg-primary font-semibold text-primary-foreground"
                   : past
                     ? "cursor-not-allowed text-muted-foreground/40"
-                    : "hover:bg-primary-soft"
+                    : "hover:bg-primary-soft hover:text-primary"
               }`}
             >
-              {d.getDate()}
+              {i + 1}
             </button>
           );
         })}

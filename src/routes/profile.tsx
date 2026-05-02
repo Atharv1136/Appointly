@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
+import { updateProfile } from "@/server/auth.functions";
+import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Profile — Appointly" }] }),
@@ -14,22 +16,38 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const { user, login } = useAuth();
+  const { user, setUser, loading } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) navigate({ to: "/login" });
-  }, [user, navigate]);
+    if (!loading && !user) navigate({ to: "/login" });
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setPhone(user.phone ?? "");
+    }
+  }, [user]);
 
   if (!user) return null;
 
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
-  const save = () => {
-    login({ ...user, name, phone });
-    toast.success("Profile updated");
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await updateProfile({ data: { name, phone } });
+      setUser(res.user as User);
+      toast.success("Profile updated");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -61,7 +79,7 @@ function ProfilePage() {
           </div>
 
           <div className="mt-6 flex justify-end">
-            <Button onClick={save}>Save changes</Button>
+            <Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save changes"}</Button>
           </div>
         </div>
       </div>
