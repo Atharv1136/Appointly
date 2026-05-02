@@ -150,42 +150,13 @@ export async function ensureSchema() {
     )
   `;
 
-  // Seed legacy catalog if empty
-  const seeded = await sql`SELECT COUNT(*)::int AS c FROM appointment_types`;
-  if (Number(seeded[0].c) === 0) {
-    const { APPT_TYPES } = await import("./services-catalog.server");
-    for (const a of APPT_TYPES) {
-      await sql`
-        INSERT INTO appointment_types
-          (id, organiser_id, title, description, category, organiser_label,
-           duration_mins, currency, manage_capacity, max_capacity,
-           advance_payment, payment_amount, manual_confirm,
-           working_start, working_end)
-        VALUES
-          (${a.id}, 'org_seed', ${a.title}, ${a.description}, ${a.category}, ${a.organiser},
-           ${a.durationMins}, ${a.currency}, ${a.manageCapacity}, ${a.maxCapacity},
-           ${a.advancePayment}, ${a.paymentAmount}, ${a.manualConfirm},
-           ${a.workingHours.start}, ${a.workingHours.end})
-        ON CONFLICT (id) DO NOTHING
-      `;
-      for (let i = 0; i < a.providers.length; i++) {
-        const p = a.providers[i];
-        await sql`
-          INSERT INTO providers (id, appointment_type_id, name, title, initials, sort_order)
-          VALUES (${p.id}, ${a.id}, ${p.name}, ${p.title}, ${p.initials}, ${i})
-          ON CONFLICT (id) DO NOTHING
-        `;
-      }
-      for (let i = 0; i < a.questions.length; i++) {
-        const q = a.questions[i];
-        await sql`
-          INSERT INTO questions (id, appointment_type_id, label, field_type, options_json, required, sort_order)
-          VALUES (${q.id + "_" + a.id}, ${a.id}, ${q.label}, ${q.type}, ${sql.json(q.options ?? [])}, ${q.required}, ${i})
-          ON CONFLICT (id) DO NOTHING
-        `;
-      }
-    }
-  }
+  // Seeding disabled — organisers create their own services from the dashboard.
+  // One-time cleanup: remove legacy demo services seeded under 'org_seed'.
+  await sql`DELETE FROM questions WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM providers WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM schedules WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM bookings WHERE appointment_type_id IN (SELECT id FROM appointment_types WHERE organiser_id = 'org_seed')`;
+  await sql`DELETE FROM appointment_types WHERE organiser_id = 'org_seed'`;
 
   _schemaReady = true;
 }
