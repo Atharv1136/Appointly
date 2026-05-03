@@ -16,6 +16,19 @@ import crypto from "crypto";
 
 export type SlotInfo = { time: string; iso: string; available: boolean; remaining: number };
 
+// Hash a string into a 32-bit signed integer for use with pg_advisory_xact_lock(int, int).
+function hash32(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h | 0;
+}
+function slotLockKeys(apptId: string, providerId: string, slotIso: string): [number, number] {
+  return [hash32(`${apptId}:${providerId}`), hash32(slotIso)];
+}
+
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 function windowsForProviderOnDate(
