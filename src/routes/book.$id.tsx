@@ -14,6 +14,7 @@ import type { AppointmentType, Provider } from "@/lib/types";
 import { getService } from "@/server/services.functions";
 import { getSlots, createBookingFn, getEarliestSlot, type SlotInfo } from "@/server/bookings.functions";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
+import { googleCalendarUrl, outlookCalendarUrl, downloadICS } from "@/lib/calendar-export";
 
 export const Route = createFileRoute("/book/$id")({
   head: () => ({ meta: [{ title: "Book appointment — CalenSync" }] }),
