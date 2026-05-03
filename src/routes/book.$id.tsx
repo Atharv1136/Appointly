@@ -457,6 +457,40 @@ function BookingPage() {
                 <p className="text-xs text-muted-foreground">Booking ID: {bookingId}</p>
               </div>
 
+              {!appt.manualConfirm && slotIso && (
+                <div className="mt-6 w-full max-w-md">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add to your calendar</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const ev = {
+                        title: appt.title,
+                        description: `${appt.organiser} · ${provider?.name ?? ""}`,
+                        location: appt.organiser,
+                        startISO: slotIso,
+                        durationMins: appt.durationMins,
+                      };
+                      return (
+                        <>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={googleCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Google
+                            </a>
+                          </Button>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={outlookCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Outlook
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadICS(ev, `${appt.title}.ics`)}>
+                            <Download className="h-4 w-4" /> .ics
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
                 <Button asChild><Link to="/appointments">View appointments</Link></Button>
                 <Button asChild variant="outline"><Link to="/services">Book another</Link></Button>
