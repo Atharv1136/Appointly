@@ -349,7 +349,16 @@ function BookingPage() {
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="p">Phone</Label>
-                  <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." />
+                  <Input
+                    id="p"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    pattern="^[+]?[0-9\s\-()]{7,20}$"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s\-()]/g, ""))}
+                    placeholder="+91 ..."
+                  />
                 </div>
               </div>
 
