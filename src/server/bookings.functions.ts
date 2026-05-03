@@ -173,6 +173,7 @@ export const getEarliestSlot = createServerFn({ method: "POST" })
     return best;
   });
 
+const bookingInputSchema = z.object({
   appointmentTypeId: z.string().min(1).max(80),
   providerId: z.string().min(1).max(80),
   slotStartISO: z.string().min(8).max(40),
