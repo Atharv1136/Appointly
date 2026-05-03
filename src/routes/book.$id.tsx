@@ -457,7 +457,7 @@ function BookingPage() {
                 <p className="text-xs text-muted-foreground">Booking ID: {bookingId}</p>
               </div>
 
-              {!appt.manualConfirm && slotIso && (
+              {slotIso && (
                 <div className="mt-6 w-full max-w-md">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add to your calendar</p>
                   <div className="flex flex-wrap gap-2">
