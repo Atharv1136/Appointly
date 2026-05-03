@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Clock, MapPin, Printer, RotateCw, Trash2, User as UserIcon } from "lucide-react";
+import { CalendarCheck, CalendarPlus, Clock, Download, MapPin, Printer, RotateCw, Trash2, User as UserIcon } from "lucide-react";
+import { googleCalendarUrl, outlookCalendarUrl, downloadICS } from "@/lib/calendar-export";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
