@@ -140,7 +140,39 @@ export const getAvailableProviderForSlot = createServerFn({ method: "POST" })
     return { providerId: null as string | null };
   });
 
-const bookingInputSchema = z.object({
+// Earliest available slot across providers within the next maxAdvanceDays.
+export const getEarliestSlot = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z.object({
+      appointmentTypeId: z.string().min(1).max(80),
+      capacityCount: z.number().int().min(1).max(50).default(1),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    await ensureSchema();
+    const appt = await dbFindAppt(data.appointmentTypeId);
+    if (!appt) throw new Error("Service not found");
+    const sql = db();
+    const horizon = appt.maxAdvanceDays ?? 60;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let best: { iso: string; providerId: string } | null = null;
+    for (let i = 0; i <= horizon; i++) {
+      const day = new Date(today); day.setDate(today.getDate() + i);
+      for (const p of appt.providers) {
+        const slots = await buildSlotsForProvider(appt, p.id, day, sql);
+        const found = slots.find((s) => s.available && s.remaining >= data.capacityCount);
+        if (found) {
+          if (!best || new Date(found.iso) < new Date(best.iso)) {
+            best = { iso: found.iso, providerId: p.id };
+          }
+        }
+      }
+      if (best) break; // earliest day with any availability wins
+    }
+    if (!best) throw new Error("No available slots in the booking window.");
+    return best;
+  });
+
   appointmentTypeId: z.string().min(1).max(80),
   providerId: z.string().min(1).max(80),
   slotStartISO: z.string().min(8).max(40),
