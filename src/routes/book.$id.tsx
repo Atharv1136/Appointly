@@ -198,20 +198,29 @@ function BookingPage() {
           {step === 0 && (
             <div className="space-y-4">
               <div className="rounded-xl border border-primary/30 bg-primary-soft p-4 sm:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Zap className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <div className="font-semibold">Quick book</div>
-                      <p className="text-xs text-muted-foreground">Auto-pick the earliest available time. You'll just fill in details and pay.</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Zap className="h-5 w-5" />
+                  </span>
+                  <div className="flex-1">
+                    <div className="font-semibold">Quick book</div>
+                    <p className="text-xs text-muted-foreground">Pick a date — we'll auto-assign the earliest available time and skip straight to your details.</p>
                   </div>
+                </div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Input
+                    type="date"
+                    value={date.toISOString().slice(0, 10)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => e.target.value && setDate(new Date(e.target.value))}
+                    className="sm:w-56"
+                  />
                   <Button
                     onClick={async () => {
                       try {
-                        const r = await getEarliestSlot({ data: { appointmentTypeId: appt.id, capacityCount: capacity } });
+                        const r = await getEarliestSlot({
+                          data: { appointmentTypeId: appt.id, capacityCount: capacity, dateISO: date.toISOString() },
+                        });
                         const prov = appt.providers.find((p) => p.id === r.providerId) ?? appt.providers[0];
                         setProvider(prov);
                         const d = new Date(r.iso);
@@ -224,7 +233,7 @@ function BookingPage() {
                       }
                     }}
                   >
-                    <Zap className="h-4 w-4" /> Quick book
+                    <Zap className="h-4 w-4" /> Quick book this date
                   </Button>
                 </div>
               </div>
