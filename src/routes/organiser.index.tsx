@@ -42,12 +42,14 @@ function OrganiserDashboard() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-muted">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="services">My services</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab /></TabsContent>
+          <TabsContent value="schedule"><ScheduleTab /></TabsContent>
           <TabsContent value="bookings"><BookingsTab /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="reports"><ReportsTab /></TabsContent>
