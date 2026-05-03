@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, Download, MapPin, Minus, Plus, User as UserIcon, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import type { AppointmentType, Provider } from "@/lib/types";
 import { getService } from "@/server/services.functions";
 import { getSlots, createBookingFn, getEarliestSlot, type SlotInfo } from "@/server/bookings.functions";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
+import { googleCalendarUrl, outlookCalendarUrl, downloadICS } from "@/lib/calendar-export";
 
 export const Route = createFileRoute("/book/$id")({
   head: () => ({ meta: [{ title: "Book appointment — CalenSync" }] }),
@@ -349,7 +350,16 @@ function BookingPage() {
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="p">Phone</Label>
-                  <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." />
+                  <Input
+                    id="p"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    pattern="^[+]?[0-9\s\-()]{7,20}$"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s\-()]/g, ""))}
+                    placeholder="+91 ..."
+                  />
                 </div>
               </div>
 
@@ -382,6 +392,8 @@ function BookingPage() {
                 <Button variant="ghost" onClick={back}><ArrowLeft className="h-4 w-4" /> Back</Button>
                 <Button onClick={() => {
                   if (!name || !email) return toast.error("Name and email are required");
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.length < 7 || digits.length > 15) return toast.error("Please enter a valid phone number");
                   for (const q of appt.questions) if (q.required && !answers[q.id]) return toast.error(`Please answer: ${q.label}`);
                   next();
                 }}>Continue <ArrowRight className="h-4 w-4" /></Button>
@@ -444,6 +456,40 @@ function BookingPage() {
                 <Row icon={UserIcon} label="Provider" value={provider?.name ?? ""} />
                 <p className="text-xs text-muted-foreground">Booking ID: {bookingId}</p>
               </div>
+
+              {!appt.manualConfirm && slotIso && (
+                <div className="mt-6 w-full max-w-md">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add to your calendar</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const ev = {
+                        title: appt.title,
+                        description: `${appt.organiser} · ${provider?.name ?? ""}`,
+                        location: appt.organiser,
+                        startISO: slotIso,
+                        durationMins: appt.durationMins,
+                      };
+                      return (
+                        <>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={googleCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Google
+                            </a>
+                          </Button>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={outlookCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Outlook
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadICS(ev, `${appt.title}.ics`)}>
+                            <Download className="h-4 w-4" /> .ics
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
                 <Button asChild><Link to="/appointments">View appointments</Link></Button>
