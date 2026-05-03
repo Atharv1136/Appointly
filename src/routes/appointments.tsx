@@ -53,8 +53,8 @@ function AppointmentsPage() {
   const cancel = async (b: Booking) => {
     try {
       await cancelBooking({ data: { id: b.id } });
-      toast.success("Booking cancelled");
-      await refresh();
+      toast.success("Booking cancelled — pick a new time to rebook");
+      navigate({ to: "/book/$id", params: { id: b.appointmentTypeId } });
     } catch (e) {
       toast.error((e as Error).message);
     }
