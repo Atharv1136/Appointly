@@ -230,6 +230,16 @@ export const createBookingFn = createServerFn({ method: "POST" })
 
     try {
       const result = await sql.begin(async (tx) => {
+        // Serialize concurrent attempts on the same (service+provider, slot) pair.
+        const [k1, k2] = slotLockKeys(appt.id, provider.id, slotStart.toISOString());
+        await tx`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
+
+        // Validate slot exists in the provider's schedule and is bookable (lead time, etc.).
+        const day = new Date(slotStart); day.setHours(0, 0, 0, 0);
+        const slots = await buildSlotsForProvider(appt, provider.id, day, tx);
+        const target = slots.find((s) => s.iso === slotStart.toISOString());
+        if (!target || !target.available) throw new Error("DOUBLE_BOOKING");
+
         const rows = await tx`
           SELECT capacity_count
           FROM bookings
@@ -237,7 +247,6 @@ export const createBookingFn = createServerFn({ method: "POST" })
             AND provider_id=${provider.id}
             AND slot_start=${slotStart}
             AND status <> 'cancelled'
-          FOR UPDATE
         `;
         const usedNum = rows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + data.capacityCount > cap) throw new Error("DOUBLE_BOOKING");
