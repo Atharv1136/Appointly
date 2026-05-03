@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import type { AppointmentType, Provider } from "@/lib/types";
 import { getService } from "@/server/services.functions";
-import { getSlots, createBookingFn, type SlotInfo } from "@/server/bookings.functions";
+import { getSlots, createBookingFn, getEarliestSlot, type SlotInfo } from "@/server/bookings.functions";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
 
 export const Route = createFileRoute("/book/$id")({
