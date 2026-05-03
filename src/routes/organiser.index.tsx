@@ -81,7 +81,7 @@ function OverviewTab() {
   if (!stats) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard icon={Calendar} label="Total bookings" value={stats.totalBookings} />
+      <StatCard icon={CalendarIcon} label="Total bookings" value={stats.totalBookings} />
       <StatCard icon={CheckCircle2} label="Confirmed" value={stats.confirmed} tone="success" />
       <StatCard icon={Clock} label="Pending" value={stats.pending} tone="warning" />
       <StatCard icon={XCircle} label="Cancelled" value={stats.cancelled} tone="danger" />
