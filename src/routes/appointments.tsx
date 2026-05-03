@@ -225,6 +225,33 @@ function BookingCard({
           )}
         </div>
       </div>
+      {!past && booking.status !== "cancelled" && service && (() => {
+        const ev = {
+          title: service.title,
+          description: `${service.organiser} · ${provider?.name ?? ""}`,
+          location: service.organiser,
+          startISO: booking.slotStart,
+          durationMins: service.durationMins,
+        };
+        return (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="text-xs font-medium text-muted-foreground">Add to calendar:</span>
+            <Button asChild size="sm" variant="outline">
+              <a href={googleCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                <CalendarPlus className="h-3.5 w-3.5" /> Google
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href={outlookCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                <CalendarPlus className="h-3.5 w-3.5" /> Outlook
+              </a>
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => downloadICS(ev, `${service.title}.ics`)}>
+              <Download className="h-3.5 w-3.5" /> .ics
+            </Button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
