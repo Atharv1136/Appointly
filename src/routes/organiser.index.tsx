@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, Briefcase, Calendar, CheckCircle2, Clock, Edit, Eye, EyeOff, Layers, Plus, Trash2, XCircle } from "lucide-react";
+import { Activity, Briefcase, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, Edit, Eye, EyeOff, Layers, Plus, Trash2, XCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { RoleGuard } from "@/components/role-guard";
