@@ -50,7 +50,7 @@ export const signupStart = createServerFn({ method: "POST" })
       VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
       ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, purpose=EXCLUDED.purpose, expires_at=EXCLUDED.expires_at, attempts=0
     `;
-    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
+    await sendEmail({ to: email, subject: "Your CalenSync verification code", html: otpEmailHtml(code), purpose: "auth" });
     return { ok: true, email };
   });
 
@@ -96,7 +96,7 @@ export const resendOtp = createServerFn({ method: "POST" })
       VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
       ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, expires_at=EXCLUDED.expires_at, attempts=0
     `;
-    await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
+    await sendEmail({ to: email, subject: "Your CalenSync verification code", html: otpEmailHtml(code), purpose: "auth" });
     return { ok: true };
   });
 
@@ -149,7 +149,7 @@ export const loginFn = createServerFn({ method: "POST" })
         VALUES (${email}, ${codeHash}, 'signup', ${expires}, 0)
         ON CONFLICT (email) DO UPDATE SET code_hash=EXCLUDED.code_hash, expires_at=EXCLUDED.expires_at, attempts=0
       `;
-      await sendEmail({ to: email, subject: "Your Appointly verification code", html: otpEmailHtml(code), purpose: "auth" });
+      await sendEmail({ to: email, subject: "Your CalenSync verification code", html: otpEmailHtml(code), purpose: "auth" });
       return { needsVerification: true as const, email };
     }
     await issueSession({ sub: u.id, email: u.email, name: u.name, role: u.role });
@@ -215,11 +215,11 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
       VALUES (${tokenHash}, ${u.id}, ${expires})
     `;
-    const origin = data.origin || process.env.PUBLIC_APP_URL || "https://appointly.app";
+    const origin = data.origin || process.env.PUBLIC_APP_URL || "https://calensync.app";
     const resetUrl = `${origin.replace(/\/$/, "")}/reset-password?token=${token}`;
     await sendEmail({
       to: email,
-      subject: "Reset your Appointly password",
+      subject: "Reset your CalenSync password",
       html: passwordResetHtml({ name: u.name, resetUrl }),
       purpose: "auth",
     });

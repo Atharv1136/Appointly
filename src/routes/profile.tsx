@@ -11,7 +11,7 @@ import { updateProfile } from "@/server/auth.functions";
 import type { User } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({
-  head: () => ({ meta: [{ title: "Profile — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Profile — CalenSync" }] }),
   component: ProfilePage,
 });
 

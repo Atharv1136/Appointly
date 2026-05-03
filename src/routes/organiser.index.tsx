@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, Briefcase, Calendar, CheckCircle2, Clock, Edit, Eye, EyeOff, Layers, Plus, Trash2, XCircle } from "lucide-react";
+import { Activity, Briefcase, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Clock, Edit, Eye, EyeOff, Layers, Plus, Trash2, XCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { RoleGuard } from "@/components/role-guard";
@@ -13,7 +14,7 @@ import { listMyServices, togglePublish, deleteService } from "@/server/organiser
 import type { AppointmentType } from "@/lib/types";
 
 export const Route = createFileRoute("/organiser/")({
-  head: () => ({ meta: [{ title: "Organiser dashboard — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Organiser dashboard — CalenSync" }] }),
   component: () => (
     <RoleGuard allow={["organiser", "admin"]}>
       <OrganiserDashboard />
@@ -41,12 +42,14 @@ function OrganiserDashboard() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-muted">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="services">My services</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab /></TabsContent>
+          <TabsContent value="schedule"><ScheduleTab /></TabsContent>
           <TabsContent value="bookings"><BookingsTab /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="reports"><ReportsTab /></TabsContent>
@@ -80,7 +83,7 @@ function OverviewTab() {
   if (!stats) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard icon={Calendar} label="Total bookings" value={stats.totalBookings} />
+      <StatCard icon={CalendarIcon} label="Total bookings" value={stats.totalBookings} />
       <StatCard icon={CheckCircle2} label="Confirmed" value={stats.confirmed} tone="success" />
       <StatCard icon={Clock} label="Pending" value={stats.pending} tone="warning" />
       <StatCard icon={XCircle} label="Cancelled" value={stats.cancelled} tone="danger" />
@@ -289,3 +292,138 @@ function ReportsTab() {
     </div>
   );
 }
+
+function ScheduleTab() {
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [services, setServices] = useState<AppointmentType[]>([]);
+  const [selected, setSelected] = useState<Date | undefined>(new Date());
+  const [month, setMonth] = useState<Date>(new Date());
+
+  useEffect(() => {
+    adminListBookings({ data: { status: "all" } })
+      .then((r) => setBookings(r.bookings))
+      .catch((e) => toast.error((e as Error).message));
+    listServices().then((r) => setServices(r.services as AppointmentType[]));
+  }, []);
+
+  const serviceMap = new Map(services.map((s) => [s.id, s]));
+
+  // Group bookings by YYYY-MM-DD
+  const byDay = new Map<string, BookingRow[]>();
+  for (const b of bookings) {
+    if (b.status === "cancelled") continue;
+    const k = new Date(b.slotStart).toLocaleDateString("en-CA");
+    const arr = byDay.get(k) ?? [];
+    arr.push(b);
+    byDay.set(k, arr);
+  }
+
+  const selectedKey = selected ? selected.toLocaleDateString("en-CA") : "";
+  const dayBookings = (byDay.get(selectedKey) ?? []).sort(
+    (a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime(),
+  );
+
+  const bookedDays = Array.from(byDay.keys()).map((k) => {
+    const [y, m, d] = k.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  });
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+        <div className="mb-3 flex items-center justify-between">
+          <button
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+            className="rounded-md p-1 hover:bg-muted"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="text-sm font-semibold">
+            {month.toLocaleString("default", { month: "long", year: "numeric" })}
+          </div>
+          <button
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            className="rounded-md p-1 hover:bg-muted"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={setSelected}
+          month={month}
+          onMonthChange={setMonth}
+          modifiers={{ booked: bookedDays }}
+          modifiersClassNames={{
+            booked: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary",
+          }}
+          className="pointer-events-auto"
+        />
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+          Days with bookings
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">
+              {selected ? selected.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Pick a day"}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {dayBookings.length} {dayBookings.length === 1 ? "booking" : "bookings"} scheduled
+            </p>
+          </div>
+        </div>
+
+        {dayBookings.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-10 text-center">
+            <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No bookings on this day.</p>
+          </div>
+        ) : (
+          <ol className="relative space-y-3 border-l border-border pl-5">
+            {dayBookings.map((b) => {
+              const svc = serviceMap.get(b.appointmentTypeId);
+              const start = new Date(b.slotStart);
+              const end = new Date(start.getTime() + (svc?.durationMins ?? 30) * 60000);
+              const tone =
+                b.status === "confirmed" ? "bg-success/15 text-success border-success/30" :
+                b.status === "pending" ? "bg-warning/15 text-warning border-warning/30" :
+                "bg-destructive/15 text-destructive border-destructive/30";
+              return (
+                <li key={b.id} className="relative">
+                  <span className="absolute -left-[26px] top-3 h-3 w-3 rounded-full border-2 border-background bg-primary" />
+                  <div className="rounded-xl border border-border bg-background/40 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {" – "}
+                          {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        <div className="mt-1 font-medium">{svc?.title ?? b.appointmentTypeId}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {b.customerName} · {b.customerEmail}
+                        </div>
+                      </div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone}`}>
+                        {b.status}
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+

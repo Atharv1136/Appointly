@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, Download, MapPin, Minus, Plus, User as UserIcon, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,12 @@ import { useAuth } from "@/lib/auth-context";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import type { AppointmentType, Provider } from "@/lib/types";
 import { getService } from "@/server/services.functions";
-import { getSlots, createBookingFn, type SlotInfo } from "@/server/bookings.functions";
+import { getSlots, createBookingFn, getEarliestSlot, type SlotInfo } from "@/server/bookings.functions";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
+import { googleCalendarUrl, outlookCalendarUrl, downloadICS } from "@/lib/calendar-export";
 
 export const Route = createFileRoute("/book/$id")({
-  head: () => ({ meta: [{ title: "Book appointment — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Book appointment — CalenSync" }] }),
   validateSearch: (s: Record<string, unknown>): { token?: string } =>
     typeof s.token === "string" && s.token ? { token: s.token } : {},
   loaderDeps: ({ search }) => ({ token: search.token }),
@@ -197,7 +198,48 @@ function BookingPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card sm:p-8">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Choose a provider</h2>
+              <div className="rounded-xl border border-primary/30 bg-primary-soft p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Zap className="h-5 w-5" />
+                  </span>
+                  <div className="flex-1">
+                    <div className="font-semibold">Quick book</div>
+                    <p className="text-xs text-muted-foreground">Pick a date — we'll auto-assign the earliest available time and skip straight to your details.</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Input
+                    type="date"
+                    value={date.toISOString().slice(0, 10)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => e.target.value && setDate(new Date(e.target.value))}
+                    className="sm:w-56"
+                  />
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const r = await getEarliestSlot({
+                          data: { appointmentTypeId: appt.id, capacityCount: capacity, dateISO: date.toISOString() },
+                        });
+                        const prov = appt.providers.find((p) => p.id === r.providerId) ?? appt.providers[0];
+                        setProvider(prov);
+                        const d = new Date(r.iso);
+                        setDate(d);
+                        setSlotIso(r.iso);
+                        toast.success(`Earliest slot: ${d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`);
+                        setStep(3);
+                      } catch (e) {
+                        toast.error((e as Error).message || "No slots available");
+                      }
+                    }}
+                  >
+                    <Zap className="h-4 w-4" /> Quick book this date
+                  </Button>
+                </div>
+              </div>
+
+              <h2 className="text-lg font-semibold">Or choose a provider</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {appt.providers.map((p) => (
                   <button
@@ -308,7 +350,16 @@ function BookingPage() {
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="p">Phone</Label>
-                  <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." />
+                  <Input
+                    id="p"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    pattern="^[+]?[0-9\s\-()]{7,20}$"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s\-()]/g, ""))}
+                    placeholder="+91 ..."
+                  />
                 </div>
               </div>
 
@@ -341,6 +392,8 @@ function BookingPage() {
                 <Button variant="ghost" onClick={back}><ArrowLeft className="h-4 w-4" /> Back</Button>
                 <Button onClick={() => {
                   if (!name || !email) return toast.error("Name and email are required");
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.length < 7 || digits.length > 15) return toast.error("Please enter a valid phone number");
                   for (const q of appt.questions) if (q.required && !answers[q.id]) return toast.error(`Please answer: ${q.label}`);
                   next();
                 }}>Continue <ArrowRight className="h-4 w-4" /></Button>
@@ -403,6 +456,40 @@ function BookingPage() {
                 <Row icon={UserIcon} label="Provider" value={provider?.name ?? ""} />
                 <p className="text-xs text-muted-foreground">Booking ID: {bookingId}</p>
               </div>
+
+              {slotIso && (
+                <div className="mt-6 w-full max-w-md">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add to your calendar</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const ev = {
+                        title: appt.title,
+                        description: `${appt.organiser} · ${provider?.name ?? ""}`,
+                        location: appt.organiser,
+                        startISO: slotIso,
+                        durationMins: appt.durationMins,
+                      };
+                      return (
+                        <>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={googleCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Google
+                            </a>
+                          </Button>
+                          <Button asChild variant="outline" size="sm">
+                            <a href={outlookCalendarUrl(ev)} target="_blank" rel="noreferrer">
+                              <CalendarPlus className="h-4 w-4" /> Outlook
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadICS(ev, `${appt.title}.ics`)}>
+                            <Download className="h-4 w-4" /> .ics
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
                 <Button asChild><Link to="/appointments">View appointments</Link></Button>

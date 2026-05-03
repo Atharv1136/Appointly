@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { requestPasswordReset } from "@/server/auth.functions";
 
 export const Route = createFileRoute("/forgot-password")({
-  head: () => ({ meta: [{ title: "Forgot password — Appointly" }] }),
+  head: () => ({ meta: [{ title: "Forgot password — CalenSync" }] }),
   component: ForgotPage,
 });
 
