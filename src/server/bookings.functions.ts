@@ -16,6 +16,19 @@ import crypto from "crypto";
 
 export type SlotInfo = { time: string; iso: string; available: boolean; remaining: number };
 
+// Hash a string into a 32-bit signed integer for use with pg_advisory_xact_lock(int, int).
+function hash32(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h | 0;
+}
+function slotLockKeys(apptId: string, providerId: string, slotIso: string): [number, number] {
+  return [hash32(`${apptId}:${providerId}`), hash32(slotIso)];
+}
+
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 function windowsForProviderOnDate(
@@ -127,6 +140,39 @@ export const getAvailableProviderForSlot = createServerFn({ method: "POST" })
     return { providerId: null as string | null };
   });
 
+// Earliest available slot across providers within the next maxAdvanceDays.
+export const getEarliestSlot = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z.object({
+      appointmentTypeId: z.string().min(1).max(80),
+      capacityCount: z.number().int().min(1).max(50).default(1),
+    }).parse(d),
+  )
+  .handler(async ({ data }): Promise<{ iso: string; providerId: string }> => {
+    await ensureSchema();
+    const appt = await dbFindAppt(data.appointmentTypeId);
+    if (!appt) throw new Error("Service not found");
+    const sql = db();
+    const horizon = appt.maxAdvanceDays ?? 60;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let best: { iso: string; providerId: string } | null = null;
+    for (let i = 0; i <= horizon; i++) {
+      const day = new Date(today); day.setDate(today.getDate() + i);
+      for (const p of appt.providers) {
+        const slots = await buildSlotsForProvider(appt, p.id, day, sql);
+        const found = slots.find((s) => s.available && s.remaining >= data.capacityCount);
+        if (found) {
+          if (!best || new Date(found.iso) < new Date(best.iso)) {
+            best = { iso: found.iso, providerId: p.id };
+          }
+        }
+      }
+      if (best) break; // earliest day with any availability wins
+    }
+    if (!best) throw new Error("No available slots in the booking window.");
+    return best;
+  });
+
 const bookingInputSchema = z.object({
   appointmentTypeId: z.string().min(1).max(80),
   providerId: z.string().min(1).max(80),
@@ -184,6 +230,16 @@ export const createBookingFn = createServerFn({ method: "POST" })
 
     try {
       const result = await sql.begin(async (tx) => {
+        // Serialize concurrent attempts on the same (service+provider, slot) pair.
+        const [k1, k2] = slotLockKeys(appt.id, provider.id, slotStart.toISOString());
+        await tx`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
+
+        // Validate slot exists in the provider's schedule and is bookable (lead time, etc.).
+        const day = new Date(slotStart); day.setHours(0, 0, 0, 0);
+        const slots = await buildSlotsForProvider(appt, provider.id, day, tx);
+        const target = slots.find((s) => s.iso === slotStart.toISOString());
+        if (!target || !target.available) throw new Error("DOUBLE_BOOKING");
+
         const rows = await tx`
           SELECT capacity_count
           FROM bookings
@@ -191,7 +247,6 @@ export const createBookingFn = createServerFn({ method: "POST" })
             AND provider_id=${provider.id}
             AND slot_start=${slotStart}
             AND status <> 'cancelled'
-          FOR UPDATE
         `;
         const usedNum = rows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + data.capacityCount > cap) throw new Error("DOUBLE_BOOKING");
@@ -360,9 +415,21 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         const rows = await tx`SELECT * FROM bookings WHERE id=${data.id} AND customer_id=${sess.sub} FOR UPDATE`;
         if (!rows.length) throw new Error("Booking not found");
         const b = rows[0];
+        if (b.status === "cancelled") throw new Error("Cannot reschedule a cancelled booking");
         const appt = await dbFindAppt(b.appointment_type_id);
         if (!appt) throw new Error("Service not found");
         const cap = appt.manageCapacity ? appt.maxCapacity : 1;
+
+        // Lock the destination slot to serialize concurrent reschedules/bookings.
+        const [k1, k2] = slotLockKeys(b.appointment_type_id, b.provider_id, slotStart.toISOString());
+        await tx`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
+
+        // Validate the destination slot is on the schedule and bookable.
+        const day = new Date(slotStart); day.setHours(0, 0, 0, 0);
+        const slots = await buildSlotsForProvider(appt, b.provider_id, day, tx);
+        const target = slots.find((s) => s.iso === slotStart.toISOString());
+        if (!target || !target.available) throw new Error("DOUBLE_BOOKING");
+
         const usedRows = await tx`
           SELECT capacity_count
           FROM bookings
@@ -371,7 +438,6 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
             AND provider_id=${b.provider_id}
             AND slot_start=${slotStart}
             AND status <> 'cancelled'
-          FOR UPDATE
         `;
         const usedNum = usedRows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + Number(b.capacity_count) > cap) throw new Error("DOUBLE_BOOKING");

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, CreditCard, MapPin, Minus, Plus, User as UserIcon, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import type { AppointmentType, Provider } from "@/lib/types";
 import { getService } from "@/server/services.functions";
-import { getSlots, createBookingFn, type SlotInfo } from "@/server/bookings.functions";
+import { getSlots, createBookingFn, getEarliestSlot, type SlotInfo } from "@/server/bookings.functions";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/payments.functions";
 
 export const Route = createFileRoute("/book/$id")({
@@ -197,7 +197,39 @@ function BookingPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card sm:p-8">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Choose a provider</h2>
+              <div className="rounded-xl border border-primary/30 bg-primary-soft p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <Zap className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <div className="font-semibold">Quick book</div>
+                      <p className="text-xs text-muted-foreground">Auto-pick the earliest available time. You'll just fill in details and pay.</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const r = await getEarliestSlot({ data: { appointmentTypeId: appt.id, capacityCount: capacity } });
+                        const prov = appt.providers.find((p) => p.id === r.providerId) ?? appt.providers[0];
+                        setProvider(prov);
+                        const d = new Date(r.iso);
+                        setDate(d);
+                        setSlotIso(r.iso);
+                        toast.success(`Earliest slot: ${d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`);
+                        setStep(3);
+                      } catch (e) {
+                        toast.error((e as Error).message || "No slots available");
+                      }
+                    }}
+                  >
+                    <Zap className="h-4 w-4" /> Quick book
+                  </Button>
+                </div>
+              </div>
+
+              <h2 className="text-lg font-semibold">Or choose a provider</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {appt.providers.map((p) => (
                   <button
