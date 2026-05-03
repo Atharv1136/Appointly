@@ -441,10 +441,15 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         `;
         const usedNum = usedRows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + Number(b.capacity_count) > cap) throw new Error("DOUBLE_BOOKING");
-        await tx`UPDATE bookings SET slot_start=${slotStart} WHERE id=${data.id}`;
+        if (appt.manualConfirm) {
+          await tx`UPDATE bookings SET slot_start=${slotStart}, status='pending' WHERE id=${data.id}`;
+        } else {
+          await tx`UPDATE bookings SET slot_start=${slotStart} WHERE id=${data.id}`;
+        }
       });
       const ctx = await emailContextForBooking(data.id);
       if (ctx) {
+        const needsApproval = ctx.appt.manualConfirm;
         const fields = {
           customerName: ctx.booking.customer_name,
           serviceTitle: ctx.appt.title,
@@ -460,15 +465,25 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         try {
           await sendEmail({
             to: ctx.booking.customer_email,
-            subject: "Your appointment was rescheduled",
-            html: bookingRescheduledHtml(fields),
+            subject: needsApproval
+              ? "Reschedule request received"
+              : "Your appointment was rescheduled",
+            html: needsApproval
+              ? bookingReservedHtml(fields)
+              : bookingRescheduledHtml(fields),
           });
           const orgEmail = await organiserEmailFor(ctx.appt.organiserId);
           if (orgEmail) {
             await sendEmail({
               to: orgEmail,
-              subject: "Booking rescheduled",
-              html: bookingRescheduledHtml(fields),
+              subject: needsApproval ? "Reschedule request — approval needed" : "Booking rescheduled",
+              html: needsApproval
+                ? organiserNewBookingHtml({
+                    ...fields,
+                    customerEmail: ctx.booking.customer_email,
+                    needsApproval: true,
+                  })
+                : bookingRescheduledHtml(fields),
             });
           }
         } catch (e) { console.error("[reschedule] email send failed", e); }
