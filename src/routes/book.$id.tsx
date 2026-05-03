@@ -391,6 +391,8 @@ function BookingPage() {
                 <Button variant="ghost" onClick={back}><ArrowLeft className="h-4 w-4" /> Back</Button>
                 <Button onClick={() => {
                   if (!name || !email) return toast.error("Name and email are required");
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.length < 7 || digits.length > 15) return toast.error("Please enter a valid phone number");
                   for (const q of appt.questions) if (q.required && !answers[q.id]) return toast.error(`Please answer: ${q.label}`);
                   next();
                 }}>Continue <ArrowRight className="h-4 w-4" /></Button>
