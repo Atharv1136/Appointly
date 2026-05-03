@@ -415,9 +415,21 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
         const rows = await tx`SELECT * FROM bookings WHERE id=${data.id} AND customer_id=${sess.sub} FOR UPDATE`;
         if (!rows.length) throw new Error("Booking not found");
         const b = rows[0];
+        if (b.status === "cancelled") throw new Error("Cannot reschedule a cancelled booking");
         const appt = await dbFindAppt(b.appointment_type_id);
         if (!appt) throw new Error("Service not found");
         const cap = appt.manageCapacity ? appt.maxCapacity : 1;
+
+        // Lock the destination slot to serialize concurrent reschedules/bookings.
+        const [k1, k2] = slotLockKeys(b.appointment_type_id, b.provider_id, slotStart.toISOString());
+        await tx`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
+
+        // Validate the destination slot is on the schedule and bookable.
+        const day = new Date(slotStart); day.setHours(0, 0, 0, 0);
+        const slots = await buildSlotsForProvider(appt, b.provider_id, day, tx);
+        const target = slots.find((s) => s.iso === slotStart.toISOString());
+        if (!target || !target.available) throw new Error("DOUBLE_BOOKING");
+
         const usedRows = await tx`
           SELECT capacity_count
           FROM bookings
@@ -426,7 +438,6 @@ export const rescheduleBooking = createServerFn({ method: "POST" })
             AND provider_id=${b.provider_id}
             AND slot_start=${slotStart}
             AND status <> 'cancelled'
-          FOR UPDATE
         `;
         const usedNum = usedRows.reduce((s: number, r: any) => s + Number(r.capacity_count ?? 0), 0);
         if (usedNum + Number(b.capacity_count) > cap) throw new Error("DOUBLE_BOOKING");
