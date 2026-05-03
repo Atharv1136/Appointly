@@ -148,7 +148,7 @@ export const getEarliestSlot = createServerFn({ method: "POST" })
       capacityCount: z.number().int().min(1).max(50).default(1),
     }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ iso: string; providerId: string }> => {
     await ensureSchema();
     const appt = await dbFindAppt(data.appointmentTypeId);
     if (!appt) throw new Error("Service not found");
